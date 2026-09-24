@@ -134,7 +134,7 @@ class SessionController(
     suspend fun weekDots(): List<WeekDot> {
         val completed = sessionLog.completedEpochDays()
         val today = clock.epochDay
-        return ((today - 6)..today).map { day ->
+        return trailingWeek.dayRange.map { day ->
             WeekDot(epochDay = day, hasCompletedSession = day in completed, today = day == today)
         }
     }
@@ -168,17 +168,20 @@ class SessionController(
         )
     }
 
-    suspend fun weeklyInterceptions(): Int = interceptionLog.weeklyCount(clock.epochDay)
+    /** The trailing week as one value, the single source of window bounds. */
+    private val trailingWeek: TrailingWeek get() = TrailingWeek.of(clock)
+
+    suspend fun weeklyInterceptions(): Int = interceptionLog.weeklyCount(trailingWeek)
 
     /** Of this week's interceptions, how many became reading sessions. */
-    suspend fun weeklyReplaced(): Int = interceptionLog.weeklyReplaced(clock.epochDay)
+    suspend fun weeklyReplaced(): Int = interceptionLog.weeklyReplaced(trailingWeek)
 
     /** Completed sessions in the trailing 7 days. */
-    suspend fun weeklySessions(): Int = sessionLog.countCompletedSince(clock.epochDay - 6)
+    suspend fun weeklySessions(): Int = sessionLog.countCompletedSince(trailingWeek.firstEpochDay)
 
     /** Minutes actually spent reading, this trailing week and all time. */
     suspend fun readingMinutes(): Pair<Long, Long> =
-        sessionLog.readMillisSince(clock.startOfDayMillis(6)).millisToMinutes() to
+        sessionLog.readMillisSince(trailingWeek.startOfDayMillis).millisToMinutes() to
             sessionLog.totalReadMillis().millisToMinutes()
 
     suspend fun minutesToday(): Long =
@@ -201,10 +204,10 @@ interface InterceptionLog {
     suspend fun record(packageId: String, result: InterceptionResult, epochDay: Long)
 
     /** Openings intercepted in the trailing 7 calendar days (continued + replaced). */
-    suspend fun weeklyCount(todayEpochDay: Long): Int
+    suspend fun weeklyCount(week: TrailingWeek): Int
 
     /** Of those, how many became reading sessions (the *replaced* path). */
-    suspend fun weeklyReplaced(todayEpochDay: Long): Int
+    suspend fun weeklyReplaced(week: TrailingWeek): Int
 }
 
 /** The reader's resume-at-last-position policy: an offset primitive, never an entity. */
@@ -243,6 +246,31 @@ interface Clock {
      *  windows bucket by local day, never by epochDay arithmetic (which would
      *  drift against real timestamps by the device's UTC offset). */
     fun startOfDayMillis(daysAgo: Int = 0): Long
+}
+
+/**
+ * The trailing 7 local days, the ONE definition of that window: epochDay bounds
+ * for per-day records, millis bounds for read-time sums. No consumer derives
+ * `today - 6` itself; everything goes through this value.
+ */
+data class TrailingWeek(
+    val firstEpochDay: Long,
+    val todayEpochDay: Long,
+    val startOfDayMillis: Long,
+    val nowMillis: Long,
+) {
+    /** Today-6..today, inclusive; exactly 7 calendar days. */
+    val dayRange: LongRange get() = firstEpochDay..todayEpochDay
+
+    companion object {
+        /** Built from the injectable clock so zone-aware day bucketing stays in one place. */
+        fun of(clock: Clock): TrailingWeek = TrailingWeek(
+            firstEpochDay = clock.epochDay - 6,
+            todayEpochDay = clock.epochDay,
+            startOfDayMillis = clock.startOfDayMillis(6),
+            nowMillis = clock.epochMillis,
+        )
+    }
 }
 
 /** One local day in the trailing week (ticket 19): the Progress strip's per-day state. */

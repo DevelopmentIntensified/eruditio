@@ -10,6 +10,7 @@ import app.eruditio.core.LedgerStore
 import app.eruditio.core.ConceptSource
 import app.eruditio.core.SessionLog
 import app.eruditio.core.SessionRecord
+import app.eruditio.core.TrailingWeek
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -40,10 +41,10 @@ class RoomInterceptionLog(private val dao: InterceptionDao) : InterceptionLog {
         dao.insert(InterceptionEntity(packageId = packageId, result = result.name, epochDay = epochDay, atMillis = System.currentTimeMillis()))
     }
 
-    override suspend fun weeklyCount(todayEpochDay: Long): Int = dao.weeklyCount(todayEpochDay - 6, todayEpochDay)
+    override suspend fun weeklyCount(week: TrailingWeek): Int = dao.weeklyCount(week.firstEpochDay, week.todayEpochDay)
 
-    override suspend fun weeklyReplaced(todayEpochDay: Long): Int =
-        dao.weeklyCountByResult(todayEpochDay - 6, todayEpochDay, InterceptionResult.REPLACED.name)
+    override suspend fun weeklyReplaced(week: TrailingWeek): Int =
+        dao.weeklyCountByResult(week.firstEpochDay, week.todayEpochDay, InterceptionResult.REPLACED.name)
 }
 
 class RoomSessionLog(private val dao: SessionDao) : SessionLog {

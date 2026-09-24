@@ -11,6 +11,7 @@ import app.eruditio.core.ConceptSource
 import app.eruditio.core.PositionStore
 import app.eruditio.core.SessionLog
 import app.eruditio.core.SessionRecord
+import app.eruditio.core.TrailingWeek
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
@@ -54,12 +55,12 @@ class FakeInterceptionLog : InterceptionLog {
         records += Record(packageId, result, epochDay)
     }
 
-    override suspend fun weeklyCount(todayEpochDay: Long): Int =
-        records.count { it.epochDay in (todayEpochDay - 6)..todayEpochDay }
+    override suspend fun weeklyCount(week: TrailingWeek): Int =
+        records.count { it.epochDay in week.dayRange }
 
-    override suspend fun weeklyReplaced(todayEpochDay: Long): Int =
+    override suspend fun weeklyReplaced(week: TrailingWeek): Int =
         records.count {
-            it.epochDay in (todayEpochDay - 6)..todayEpochDay && it.result == InterceptionResult.REPLACED
+            it.epochDay in week.dayRange && it.result == InterceptionResult.REPLACED
         }
 
     val all: List<Record> get() = records.toList()
