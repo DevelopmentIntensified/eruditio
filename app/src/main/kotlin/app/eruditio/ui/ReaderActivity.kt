@@ -20,6 +20,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +51,9 @@ class ReaderActivity : androidx.activity.ComponentActivity() {
 
     private var readingSince: Long? = null
 
+    /** Set by ReadingBody; flushes the current top-of-screen line position immediately. */
+    internal var flushPosition: (() -> Unit)? = null
+
     override fun onResume() {
         super.onResume()
         readingSince = System.currentTimeMillis()
@@ -57,6 +61,9 @@ class ReaderActivity : androidx.activity.ComponentActivity() {
 
     override fun onPause() {
         flushReadingTime()
+        // The top visible line is the user's place: persist it now, not at the
+        // next debounce tick, so leaving mid-scroll still restores the exact line.
+        flushPosition?.invoke()
         super.onPause()
     }
 
@@ -194,9 +201,24 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
     val items = loaded.items
     val starts = remember(items) { items.map { it.startChar } }
     val scope = rememberCoroutineScope()
+    val activity = LocalContext.current as? ReaderActivity
+
+    // The top visible line is the user's place: the debounced saver persists it
+    // while scrolling, and activity pause flushes it immediately without waiting
+    // for the debounce. Resume = scroll so this item is the FIRST visible item.
+    fun saveTopLine() {
+        val idx = listState.firstVisibleItemIndex
+        val start = starts.getOrNull(idx) ?: return
+        scope.launch { container.positions.save(loaded.textId, start, idx) }
+    }
 
     LaunchedEffect(loaded) {
         if (loaded.startItem > 0) listState.scrollToItem(loaded.startItem)
+    }
+
+    DisposableEffect(activity, loaded) {
+        activity?.flushPosition = { saveTopLine() }
+        onDispose { activity?.flushPosition = null }
     }
 
     LaunchedEffect(listState, loaded) {
@@ -232,17 +254,17 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
         }
         Button(
             onClick = {
-                // "I read to here" = the bottom of what is actually on screen.
-                // The saved resume point is the last VISIBLE line itself, so a
-                // reopen lands on the exact line checked in at, not past it.
-                val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
-                    ?: listState.firstVisibleItemIndex
-                val end = starts.getOrNull(lastVisible + 1) ?: loaded.textLength
+                // "I read to here" = the bottom of what is actually on screen
+                // (counted into the session), but the RESUME point is the top
+                // visible line itself, so a reopen lands on the exact line the
+                // user was reading at — never past it.
+                val firstVisible = listState.firstVisibleItemIndex
+                val end = starts.getOrNull(firstVisible + 1) ?: loaded.textLength
                 scope.launch {
                     val done = container.sessions.completeSession(loaded.sessionId, end)
                     if (done != null) {
-                        val resumeStart = items[lastVisible].startChar
-                        container.positions.save(loaded.textId, resumeStart, lastVisible)
+                        val resumeStart = items[firstVisible].startChar
+                        container.positions.save(loaded.textId, resumeStart, firstVisible)
                         // Recommended next reading: another unstarted classic,
                         // same content group first (in-app momentum over feeds).
                         val next = container.library.texts.firstOrNull {
