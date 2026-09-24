@@ -10,6 +10,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * Seam tests for the session controller (spec): interception decisions, outcome
@@ -154,6 +156,36 @@ class SessionControllerTest {
         sessionLog.addReadingTime(sessionId, 181_759L)
         assertEquals(3L, controller.minutesToday())
         assertEquals(3L to 3L, controller.readingMinutes())
+    }
+
+    @Test
+    fun `reading minutes bucket by local day, not UTC midnight`() = runTest {
+        // UTC+05:30 device, local 01:00: the whole first 5.5h of the local day
+        // sit BEFORE the local date's UTC midnight — the drift the epochDay
+        // arithmetic used to introduce (early-morning reading excluded).
+        val zone = ZoneId.of("UTC+05:30")
+        val today = LocalDate.of(2026, 9, 24)
+        val clock = ZoneClock(today.atTime(1, 0).atZone(zone).toInstant().toEpochMilli(), zone)
+        val controller = SessionController(
+            scheduler = scheduler,
+            ledger = ledger,
+            interceptionLog = interceptLog,
+            sessionLog = sessionLog,
+            concepts = concepts,
+            gate = TrialGate(entitlement, isDebug = false),
+            clock = clock,
+        )
+        // A session inside local day today-6, also inside the UTC blind spot.
+        clock.instantMillis = today.minusDays(6).atTime(0, 30).atZone(zone).toInstant().toEpochMilli()
+        val early = controller.startSession("crito") as SessionStart.Opened
+        sessionLog.addReadingTime(early.sessionId, 60_000L)
+        // A session at local 01:00 today — after local midnight, before UTC midnight.
+        clock.instantMillis = today.atTime(1, 0).atZone(zone).toInstant().toEpochMilli()
+        val late = controller.startSession("demo:apology") as SessionStart.Opened
+        sessionLog.addReadingTime(late.sessionId, 120_000L)
+
+        assertEquals(2L, controller.minutesToday()) // only today's local-day session
+        assertEquals(3L to 3L, controller.readingMinutes()) // both local days, not raw UTC days
     }
 
     @Test

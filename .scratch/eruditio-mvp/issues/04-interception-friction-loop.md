@@ -14,3 +14,7 @@
 - [ ] Manual smoke on device passes for both paths
 
 **2026-09-24 — agent**: Pause screen (10 s breathing delay, explicit continue), target list with defaults, UsageStatsManager polling service (no AccessibilityService), outcomes recorded at the seam. Per user direction, "Read a page instead" no longer waits out the delay; "Continue" still does. Manual smoke on device pending (human).
+
+## Comments
+
+- **2026-09-24 — review fix**: Dismissing the pause screen with Back now records the outcome as *continued* (the user proceeds to the app beneath the overlay) before finishing — story 4's "choice recorded" and ticket 09's weekly count no longer under-report. Limitation: the system Home button is not interceptable by an Activity, so a Home-press dismissal stays unrecorded. The recording is asynchronous via the app-scope coroutine but is not coupled to the watcher's re-intercept cooldown (cooldown keys on `SystemClock.elapsedRealtime`, recording on epoch day) — the record lands regardless of when the target app is foregrounded again.

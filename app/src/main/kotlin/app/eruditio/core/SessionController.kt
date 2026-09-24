@@ -137,11 +137,11 @@ class SessionController(
 
     /** Minutes actually spent reading, this trailing week and all time. */
     suspend fun readingMinutes(): Pair<Long, Long> =
-        sessionLog.readMillisSince((clock.epochDay - 6) * 86_400_000L).millisToMinutes() to
+        sessionLog.readMillisSince(clock.startOfDayMillis(6)).millisToMinutes() to
             sessionLog.totalReadMillis().millisToMinutes()
 
     suspend fun minutesToday(): Long =
-        sessionLog.readMillisSince(clock.epochDay * 86_400_000L).millisToMinutes()
+        sessionLog.readMillisSince(clock.startOfDayMillis()).millisToMinutes()
 }
 
 /** Floor millis to whole minutes: progress surfaces report minutes, never ms. */
@@ -192,6 +192,11 @@ interface ConceptSource {
 interface Clock {
     val epochDay: Long
     val epochMillis: Long
+
+    /** Local start-of-day `daysAgo` days back, in the clock's zone. Reading-time
+     *  windows bucket by local day, never by epochDay arithmetic (which would
+     *  drift against real timestamps by the device's UTC offset). */
+    fun startOfDayMillis(daysAgo: Int = 0): Long
 }
 
 /** One local day in the trailing week (ticket 19): the Progress strip's per-day state. */

@@ -16,7 +16,7 @@ import app.eruditio.ui.EruditioViewModel
 /**
  * Single-activity app shell: Home / Library / Review / Progress.
  * Reader is its own quiet activity; the pause overlay lives in intercept/.
- * Visual restyle pending the wireframe direction; wiring is final.
+ * Variant-A shell shipped (wireframe direction); wiring is final.
  */
 class MainActivity : androidx.activity.ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

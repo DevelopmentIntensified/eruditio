@@ -12,3 +12,7 @@
 - [ ] Debug screen displays the due set for a synthetic ledger
 
 **2026-09-24 — agent**: Agent work complete. 13 seam tests pass (mastery table, hard/again/easy, decay, re-master, missed days, deterministic ordering, limits, challenge selection). Debug synthetic-ledger surface now registers only in debug builds (`app/src/debug/AndroidManifest.xml`). Remaining human step: glance at Progress → "Debug: synthetic ledger due set" on device.
+
+## Comments
+
+- **2026-09-24 — review fix**: Mastery challenge now reaches the user (spec story 14): when the due set is empty and the challenge set is non-empty, the Review tab serves challenge cards. Placement: VM-side fallback with a mode flag (`EruditioViewModel.servedReviewCards()` + `ReviewState.isChallenge`) — the review state machine (`current`/`index`/`total`) lives in the VM, so the rule sits there with one home; grading still flows through the seam's existing grade path. Caption stays claim-disciplined: "Mastery challenge · learned material resurfacing".

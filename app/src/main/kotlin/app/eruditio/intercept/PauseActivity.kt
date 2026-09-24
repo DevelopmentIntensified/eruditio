@@ -3,6 +3,7 @@ package app.eruditio.intercept
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -53,6 +54,20 @@ class PauseActivity : androidx.activity.ComponentActivity() {
         super.onCreate(savedInstanceState)
         val target = intent.getStringExtra(EXTRA_TARGET).orEmpty()
         val container = (application as EruditioApp).container
+
+        // Story 4: a dismissed pause screen still records its outcome. Back
+        // means the user proceeds to the app beneath the overlay — the same
+        // *continued* outcome the Continue button records. (The system Home
+        // button is not interceptable from an Activity and stays unrecorded.)
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    cont(target)
+                    finish()
+                }
+            },
+        )
 
         var enabled by mutableStateOf(false)
 

@@ -46,8 +46,6 @@ class AppContainer(private val app: Application) {
      */
     val pauseToHome = mutableStateOf(false)
     fun today(): Long = clock.epochDay
-    fun todayStartMillis(): Long = clock.startOfDayMillis()
-    fun weekAgoMillis(): Long = System.currentTimeMillis() - 7L * 86_400_000L
 
     val themes = ThemeStore(app)
     val reading = ReadingSettings(app)

@@ -9,7 +9,7 @@ data class TargetApp(
 )
 
 object TargetApps {
-    private val prefs get() = "target_apps"
+    private const val PREFS_FILE = "target_apps"
     private val defaultTargets = listOf(
         TargetApp("com.instagram.android", "Instagram"),
         TargetApp("com.zhiliaoapp.musically", "TikTok"),
@@ -25,14 +25,14 @@ object TargetApps {
     fun defaults(): List<TargetApp> = defaultTargets
 
     fun selected(context: Context): List<TargetApp> {
-        val p = context.getSharedPreferences(prefs, Context.MODE_PRIVATE)
+        val p = context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
         if (!p.contains("configured")) return defaultTargets
         val chosen = p.getStringSet("packages", emptySet()) ?: emptySet()
         return defaultTargets.filter { it.packageId in chosen }
     }
 
     fun save(context: Context, packages: Set<String>) {
-        context.getSharedPreferences(prefs, Context.MODE_PRIVATE)
+        context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
             .edit().putBoolean("configured", true).putStringSet("packages", packages).apply()
     }
 
