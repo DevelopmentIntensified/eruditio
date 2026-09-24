@@ -12,13 +12,26 @@ import app.eruditio.core.SessionLog
 import app.eruditio.core.SessionRecord
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.time.Instant
+import java.time.ZoneId
 
 /* ---- fakes for the seam stores (no Android) ---- */
 
 class TestClock(private var day: Long) : Clock {
     override val epochDay: Long get() = day
     override val epochMillis: Long get() = day * 86_400_000L
+    override fun startOfDayMillis(daysAgo: Int): Long = (day - daysAgo) * 86_400_000L
     fun advance(days: Long) { day += days }
+}
+
+/** Fixed-instant clock in a fixed zone: pins local-day bucketing against UTC drift. */
+class ZoneClock(var instantMillis: Long, private val zone: ZoneId) : Clock {
+    override val epochMillis: Long get() = instantMillis
+    override val epochDay: Long
+        get() = Instant.ofEpochMilli(instantMillis).atZone(zone).toLocalDate().toEpochDay()
+    override fun startOfDayMillis(daysAgo: Int): Long =
+        Instant.ofEpochMilli(instantMillis).atZone(zone).toLocalDate()
+            .minusDays(daysAgo.toLong()).atStartOfDay(zone).toInstant().toEpochMilli()
 }
 
 class FakeLedgerStore : LedgerStore {

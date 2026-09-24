@@ -22,9 +22,10 @@ class DeviceClock(private val zone: ZoneId = ZoneId.systemDefault()) : Clock {
     override val epochDay: Long
         get() = Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate().toEpochDay()
 
-    /** Local start-of-today, for "minutes today" style stats. */
-    fun startOfDayMillis(): Long =
-        java.time.LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
+    /** Local start-of-day `daysAgo` days back, for "minutes today" style stats. */
+    override fun startOfDayMillis(daysAgo: Int): Long =
+        Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate()
+            .minusDays(daysAgo.toLong()).atStartOfDay(zone).toInstant().toEpochMilli()
 }
 
 class RoomLedgerStore(private val dao: LedgerDao) : LedgerStore {
