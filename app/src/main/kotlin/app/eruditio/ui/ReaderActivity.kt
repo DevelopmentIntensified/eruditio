@@ -4,6 +4,12 @@ import android.app.Activity
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -316,8 +322,38 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
                 ) {
                     // Constant 18dp start gutter; checkpoint rows carry a 9dp
                     // dot, every row indents alike so the text edge stays put.
+                    // Ticket 20 variant B: the nearest on-screen dot breathes in
+                    // the accent color; the rest stay quiet (muted outline).
                     Box(Modifier.width(18.dp)) {
-                        if (i % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1) {
+                        if (i % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1 &&
+                            i == visibleCheckpoint
+                        ) {
+                            val accent = MaterialTheme.colorScheme.tertiary
+                            val breathe = rememberInfiniteTransition(label = "checkpoint-dot")
+                            val p by breathe.animateFloat(
+                                initialValue = 0f,
+                                targetValue = 1f,
+                                animationSpec = infiniteRepeatable(
+                                    tween(1600, easing = FastOutSlowInEasing),
+                                ),
+                                label = "breath-progress",
+                            )
+                            Canvas(
+                                Modifier.align(Alignment.TopCenter)
+                                    .padding(top = 16.dp)
+                                    .size(9.dp),
+                            ) {
+                                val r = size.minDimension / 2f
+                                // 1 -> 1.25 -> 1, a soft ring fading out underneath.
+                                val cycle = 1f - kotlin.math.abs(1f - 2f * p)
+                                val scale = 1f + 0.25f * cycle
+                                drawCircle(
+                                    color = accent.copy(alpha = 0.5f * (1f - cycle)),
+                                    radius = r * scale + 5.dp.toPx() * cycle,
+                                )
+                                drawCircle(color = accent, radius = r * scale)
+                            }
+                        } else if (i % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1) {
                             Box(
                                 Modifier.align(Alignment.TopCenter)
                                     .padding(top = 16.dp)
