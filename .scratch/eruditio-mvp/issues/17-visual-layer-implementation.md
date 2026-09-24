@@ -15,13 +15,15 @@ spins out only after the owner's per-element verdicts.
 
 **Blocked by:** owner verdicts per element (recorded here under Comments).
 
-**Status:** claimed
+**Status:** resolved
 
 - [x] Prototype branch exists with all four questions, state surfaced, pick buttons
-- [ ] Owner verdicts recorded per element
-- [ ] Implementation ticket spun out (18-visual-layer-build) with the verdict folded in
+- [x] Owner verdicts recorded per element
+- [x] Implementation ticket spun out (18-visual-layer-build) with the verdict folded in
 
 ## Comments
 
 **2026-09-24 — owner (via implement session)**: "16, prototype them first" — supersedes direct implementation; prototype the four directions before any Compose work.
 **2026-09-24 — agent**: Prototype built and smoke-verified (browser: all pages, all variants, zero console errors; screenshots confirm rendering). Awaiting owner verdicts.
+**2026-09-24 — owner (verdict URL)**: `picks=week:B, dials:A, signature:B, plates:A` — plus directive: plates must be accurate (verify each time or embed from other sources).
+**2026-09-24 — agent**: Verdicts recorded; to-tickets quiz approved (four tickets, all gated on ticket 15; plates scope = map + timeline). Implementation spun out: `18-quarters-dial-library.md`, `19-streak-head-week-dots.md`, `20-breathing-checkpoint-marks.md`, `21-sourced-plates-ancient.md`. This ticket resolved; owner preference recorded in `AGENTS.md` (prototype-first).
