@@ -68,6 +68,7 @@ import app.eruditio.MainActivity
 import app.eruditio.R
 import app.eruditio.core.CompletedSession
 import app.eruditio.core.Groups
+import app.eruditio.core.ReaderText
 import app.eruditio.ui.theme.EruditioTheme
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
@@ -164,9 +165,8 @@ private data class Loaded(
     val title: String,
     val author: String,
     val group: String,
-    val items: List<ReaderItem>,
+    val readerText: ReaderText,
     val startItem: Int,
-    val textLength: Long,
 )
 
 private data class CompletedView(
@@ -174,97 +174,6 @@ private data class CompletedView(
     val completed: CompletedSession,
     val next: app.eruditio.data.TextMeta?,
 )
-
-/** One scroll item: a paragraph, or a single line of an oversized block. */
-private data class ReaderItem(
-    val text: String,
-    val startChar: Long,
-    val startsParagraph: Boolean,
-)
-
-private const val MAX_ITEM_CHARS = 2000
-
-/**
- * Checkpoint spacing (ticket 14, variant A widened): items with
- * index % 12 == 11 are checkpoints — a gutter dot, and a quiet "Pause here"
- * chip while one is on screen. Defined on reader ITEM indexes.
- */
-private const val CHECKPOINT_SPACING = 12
-
-/** A TEXT-item index is a checkpoint when it sits at the spacing rhythm's end. */
-private fun isCheckpoint(textItemIndex: Int) =
-    textItemIndex % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1
-
-/**
- * Plate frontispiece (ticket 21): ancient-track texts (TextMeta.group ==
- * Groups.ANCIENT) prepend ONE plate item before all text items, like a book
- * frontispiece. Every persisted position — resume saves, checkpoints, rail
- * ticks — stays in TEXT-item space, so checkpoint math and the anchor
- * contract are untouched; the offset is applied only at the scroll
- * boundaries (firstVisibleItemIndex reads, scrollToItem restores), and the
- * first visible item IS still the place — including when it is the plate.
- */
-private const val PLATE_ITEM_COUNT = 1
-
-/** Header offset for this text: 1 plate item for the ancient track, else 0. */
-private val Loaded.plateOffset: Int
-    get() = if (group == Groups.ANCIENT) PLATE_ITEM_COUNT else 0
-
-/**
- * Single source for the plate-offset boundary arithmetic: every scroll-list
- * index read or written converts through these helpers, so the invariant —
- * persisted state lives in TEXT-item space, the offset is applied only at
- * list boundaries — holds by construction.
- */
-/** Scroll-list index -> TEXT-item index, clamped above the plate header. */
-private fun Loaded.textIndexOf(listIdx: Int): Int = (listIdx - plateOffset).coerceAtLeast(0)
-
-/** TEXT-item index -> scroll-list index. */
-private fun Loaded.listIndexOf(textIdx: Int): Int = textIdx + plateOffset
-
-/** Scroll-list item count: every text item plus the plate header. */
-private val Loaded.listItemCount: Int get() = items.size + plateOffset
-
-/**
- * Split with cumulative character offsets for exact restore. Blocks split on
- * blank lines keep their offsets; a block larger than a couple of screens
- * (verse runs with no blank lines) is cut into per-line items so progress and
- * restore stay granular instead of jumping to 100% on one check-in.
- */
-private fun readerItems(text: String): List<ReaderItem> {
-    val items = mutableListOf<ReaderItem>()
-    var start = 0L
-    for (block in text.split("\n\n")) {
-        val blockStart = start
-        start += block.length.toLong() + 2
-        if (block.isBlank()) continue
-        val trimmed = block.trim()
-        if (trimmed.length <= MAX_ITEM_CHARS) {
-            items += ReaderItem(trimmed, blockStart, true)
-        } else {
-            var idx = 0
-            var first = true
-            for (line in block.split("\n")) {
-                val t = line.trim()
-                if (t.isNotEmpty()) {
-                    items += ReaderItem(t, blockStart + idx, first)
-                    first = false
-                }
-                idx += line.length + 1
-            }
-        }
-    }
-    if (items.isEmpty()) items += ReaderItem(text.trim(), 0L, true)
-    return items
-}
-
-private fun itemIndexAt(items: List<ReaderItem>, charOffset: Long): Int {
-    var best = 0
-    for ((index, item) in items.withIndex()) {
-        if (item.startChar <= charOffset) best = index else break
-    }
-    return best
-}
 
 @OptIn(FlowPreview::class)
 @Composable
@@ -277,16 +186,15 @@ private fun ReaderScreen(container: AppContainer, sessionId: Long) {
         val record = container.sessionLog.get(sessionId) ?: return@LaunchedEffect
         val text = container.library.text(record.textId)
         val meta = container.library.meta(record.textId)
-        val items = readerItems(text)
+        val readerText = ReaderText.of(text, meta?.group.orEmpty())
         loaded.value = Loaded(
             sessionId = sessionId,
             textId = record.textId,
             title = meta?.title ?: record.textId,
             author = meta?.author.orEmpty(),
             group = meta?.group.orEmpty(),
-            items = items,
-            startItem = itemIndexAt(items, record.startChar),
-            textLength = text.length.toLong(),
+            readerText = readerText,
+            startItem = readerText.itemIndexAt(record.startChar),
         )
     }
 
@@ -316,8 +224,8 @@ private fun ReadingBody(
     onCompleted: (CompletedView) -> Unit,
 ) {
     val listState = rememberLazyListState()
-    val items = loaded.items
-    val starts = remember(items) { items.map { it.startChar } }
+    val readerText = loaded.readerText
+    val items = readerText.items
     val scope = rememberCoroutineScope()
 
     // The top visible line is the user's place: the debounced saver persists it
@@ -326,13 +234,13 @@ private fun ReadingBody(
     // The list index is a text-item index + the plate offset; persisted saves
     // stay in TEXT-item space (the plate itself counts as "the beginning").
     fun saveTopLine() {
-        val idx = loaded.textIndexOf(listState.firstVisibleItemIndex)
-        val start = starts.getOrNull(idx) ?: return
+        val idx = readerText.textIndexOf(listState.firstVisibleItemIndex)
+        val start = readerText.startCharAt(idx) ?: return
         scope.launch { container.positions.save(loaded.textId, start, idx) }
     }
 
     LaunchedEffect(loaded) {
-        if (loaded.startItem > 0) listState.scrollToItem(loaded.listIndexOf(loaded.startItem))
+        if (loaded.startItem > 0) listState.scrollToItem(readerText.listIndexOf(loaded.startItem))
     }
 
     DisposableEffect(onRegisterFlush, loaded) {
@@ -351,8 +259,8 @@ private fun ReadingBody(
                 .debounce(600)
                 .distinctUntilChanged()
                 .collect { listIdx ->
-                    val idx = loaded.textIndexOf(listIdx)
-                    val start = starts.getOrNull(idx) ?: return@collect
+                    val idx = readerText.textIndexOf(listIdx)
+                    val start = readerText.startCharAt(idx) ?: return@collect
                     container.positions.save(loaded.textId, start, idx)
                 }
         }
@@ -365,8 +273,8 @@ private fun ReadingBody(
         derivedStateOf {
             listState.layoutInfo.visibleItemsInfo
                 .asSequence()
-                .map { loaded.textIndexOf(it.index) }
-                .filter(::isCheckpoint)
+                .map { readerText.textIndexOf(it.index) }
+                .filter { readerText.isCheckpoint(it) }
                 .minOrNull()
         }
     }
@@ -378,7 +286,7 @@ private fun ReadingBody(
         derivedStateOf {
             val info = listState.layoutInfo.visibleItemsInfo
             if (info.isEmpty()) null
-            else loaded.textIndexOf(info.minOf { it.index })..loaded.textIndexOf(info.maxOf { it.index })
+            else readerText.textIndexOf(info.minOf { it.index })..readerText.textIndexOf(info.maxOf { it.index })
         }
     }
 
@@ -392,10 +300,9 @@ private fun ReadingBody(
         // checkpoint position after it lands.
         saveJob?.cancel()
         onRegisterFlush(null)
-        val next = ((checkpoint + 1)..items.lastIndex).firstOrNull(::isCheckpoint)
-        val end = next?.let { starts[it] } ?: loaded.textLength
+        val end = readerText.segmentEndAfter(checkpoint)
         scope.launch {
-            container.positions.save(loaded.textId, starts[checkpoint], checkpoint)
+            container.positions.save(loaded.textId, items[checkpoint].startChar, checkpoint)
             container.sessions.completeSession(loaded.sessionId, end)
             // Land on Home/Today when the shell returns (consumed in App.kt).
             container.pauseToHome.value = true
@@ -406,7 +313,7 @@ private fun ReadingBody(
     // Rail state: checkpoint item indexes and the togglable on/off.
     val railEnabled by container.reading.railEnabled.collectAsState()
     val checkpointIndexes = remember(items) {
-        items.indices.filter(::isCheckpoint).toIntArray()
+        items.indices.filter { readerText.isCheckpoint(it) }.toIntArray()
     }
 
     // Full-screen plate viewer (map + timeline) over the ancient track.
@@ -425,8 +332,8 @@ private fun ReadingBody(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(24.dp),
             ) {
-            items(loaded.listItemCount) { i ->
-                if (i < loaded.plateOffset) {
+            items(readerText.listItemCount) { i ->
+                if (i < readerText.plateItems) {
                     // Ticket 21: the ancient-track frontispiece — a sourced
                     // map plate as the first list item, tap to open the
                     // full-screen plate viewer. Not part of the text: no
@@ -436,7 +343,7 @@ private fun ReadingBody(
                         modifier = Modifier.fillParentMaxWidth().fillParentMaxHeight(0.9f),
                     )
                 } else {
-                val textIndex = loaded.textIndexOf(i)
+                val textIndex = readerText.textIndexOf(i)
                 val item = items[textIndex]
                 Row(
                     Modifier.fillMaxWidth()
@@ -449,7 +356,7 @@ private fun ReadingBody(
                     // B: every dot whose TEXT index is on screen breathes in
                     // the accent color; the rest stay quiet (muted outline).
                     Box(Modifier.width(18.dp)) {
-                        if (isCheckpoint(textIndex)) {
+                        if (readerText.isCheckpoint(textIndex)) {
                             if (visibleTextWindow?.contains(textIndex) == true) {
                                 val accent = MaterialTheme.colorScheme.tertiary
                                 val breathe = rememberInfiniteTransition(label = "checkpoint-dot")
@@ -499,8 +406,8 @@ private fun ReadingBody(
             // tracks raw list indexes, so it counts the plate too, while the
             // checkpoint tick indexes shift into list space by the offset.
             Rail(
-                checkpoints = checkpointIndexes.map { loaded.listIndexOf(it) }.toIntArray(),
-                itemCount = loaded.listItemCount,
+                checkpoints = checkpointIndexes.map { readerText.listIndexOf(it) }.toIntArray(),
+                itemCount = readerText.listItemCount,
                 listState = listState,
                 enabled = railEnabled,
                 scope = scope,
@@ -522,12 +429,12 @@ private fun ReadingBody(
                 // visible line itself, so a reopen lands on the exact line the
                 // user was reading at — never past it. List index -> text-item
                 // index via the plate offset; saves stay in TEXT-item space.
-                val firstVisible = loaded.textIndexOf(listState.firstVisibleItemIndex)
-                val end = starts.getOrNull(firstVisible + 1) ?: loaded.textLength
+                val firstVisible = readerText.textIndexOf(listState.firstVisibleItemIndex)
+                val end = readerText.segmentEndAfter(firstVisible)
                 scope.launch {
                     val done = container.sessions.completeSession(loaded.sessionId, end)
                     if (done != null) {
-                        val resumeStart = items[firstVisible].startChar
+                        val resumeStart = readerText.items[firstVisible].startChar
                         container.positions.save(loaded.textId, resumeStart, firstVisible)
                         // Recommended next reading: another unstarted classic,
                         // same content group first (in-app momentum over feeds).
