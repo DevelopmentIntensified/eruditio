@@ -4,8 +4,20 @@ Pull the next task from the queue below. Do **not** re-read all ticket files to 
 
 ## Queue (next up, in order)
 
-1. **Final /code-review round** over `main..eruditio-mvp-2` (per implement-spec: all tickets complete → review the PR branch; fix all findings in a single implementer pass). Previous round already landed (`b6082de` + `984b606`); this one covers ticket 22 too.
-2. After review fixes: mark branch ready (no git remote configured — no hosted PR exists; see State below), clean up the `t22-bug-report` worktree.
+(none — agent work complete; branch ready)
+
+## Recently completed
+
+- **Deepening review round + fix pass** — final review over `f6f99f1...HEAD` (Standards + Spec axes, both read-only scouts; spec verified statically, std confirmed post-state): six promises held; fix pass merged as `13cf617`: dead `paragraphIndex` column dropped (Room schema v2→v3, non-destructive migration), named `isStarted`/`isReadThrough` predicates (LibrarySelection rule enforced), shared `AppContainer.progressById()`, `sessions.resumeTextId()` (PauseActivity's last positions reach absorbed — promise 3 now fully held), fake de-dup, `weekDots` uses the TrailingWeek value, ADR-0002 amendment names pure predicate modules under `ui/`. Suppressed finding: the three one-line SessionLog port forwards are the owner-directed reach-closing interface, not Middle Men.
+- **Deepening candidates 1–5** — per-candidate worktrees, owner-approved one by one, merged `df0649a` → `7a0310d`.
+- **Pre-deepening review round** — merged as `f6f99f1` (zone-drift fix + seam test, challenge fallback, back-press records continued, saveJob fix, Groups constants, CONTEXT.md + ADRs 0001–0005).
+
+## State of the branch
+
+- `eruditio-mvp-2` @ final merge of `deepening-review-fixes` — the MVP spec (tickets 01–22) plus two review rounds plus a five-candidate deepening round, all merged. 70 seam/unit tests green.
+- No git remote configured → no hosted draft PR exists; the branch itself is the deliverable. Marking "ready" = this state.
+- Human steps remain per ticket (all recorded on the ticket files, statuses ready-for-human): device smoke per ticket, Play internal testing (10), USPTO + package id (11).
+- Pre-existing (out of delta, flagged, not fixed): `AppContainer.textLength` first hit loads the asset synchronously on the caller's dispatcher — jank candidate on first open; the ×30 percent recompute per refresh/check-in predates and was owner-approved at the C4 gate.
 
 ## Bookkeeping pending
 
