@@ -69,6 +69,11 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
 
     fun selectTheme(palette: Palette) = container.themes.select(palette)
 
+    /** Ticket 15: togglable margin rail in the reader, persisted on-device. */
+    val railEnabled: StateFlow<Boolean> = container.reading.railEnabled
+
+    fun setRailEnabled(enabled: Boolean) = container.reading.setRailEnabled(enabled)
+
     /** The one unlock rule (TrialGate.isUnlocked), observed reactively so a
      *  completed purchase unlocks the Home card without a manual refresh. */
     val gateLocked: StateFlow<Boolean> =
