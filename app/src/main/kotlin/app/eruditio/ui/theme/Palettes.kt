@@ -67,6 +67,8 @@ object Palettes {
     fun byId(id: String?): Palette = all.firstOrNull { it.id == id } ?: default
 }
 
+private val notchGold = Color(0xFFC8A24A)
+
 private fun schemeOf(palette: Palette): ColorScheme {
     val colors = mapOf(
         "primary" to palette.accent,
@@ -90,6 +92,7 @@ private fun schemeOf(palette: Palette): ColorScheme {
             surfaceVariant = colors.getValue("surfaceVariant"),
             onSurfaceVariant = colors.getValue("onSurfaceVariant"),
             outline = colors.getValue("outline"),
+            tertiary = notchGold,
         )
     } else {
         lightColorScheme(
@@ -102,6 +105,7 @@ private fun schemeOf(palette: Palette): ColorScheme {
             surfaceVariant = colors.getValue("surfaceVariant"),
             onSurfaceVariant = colors.getValue("onSurfaceVariant"),
             outline = colors.getValue("outline"),
+            tertiary = notchGold,
         )
     }
 }

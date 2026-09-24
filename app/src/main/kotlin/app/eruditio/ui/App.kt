@@ -404,19 +404,7 @@ private fun LibraryScreen(vm: EruditioViewModel, modifier: Modifier) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                when {
-                    pct == 100 -> Text(
-                        "read",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    pct > 0 -> Ring(pct / 100f)
-                    else -> Text(
-                        "unread",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                QuartersDial(pct / 100f)
             }
             HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
         }
