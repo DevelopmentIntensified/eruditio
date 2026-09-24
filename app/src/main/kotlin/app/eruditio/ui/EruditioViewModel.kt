@@ -13,6 +13,8 @@ import app.eruditio.core.RecallGrade
 import app.eruditio.core.SessionRecord
 import app.eruditio.core.SessionStart
 import app.eruditio.core.TrialGate
+import app.eruditio.intercept.TargetApp
+import app.eruditio.intercept.TargetApps
 import app.eruditio.ui.theme.Palette
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -73,6 +75,18 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
 
     private val gateErrorState = MutableStateFlow<String?>(null)
     val gateError: StateFlow<String?> = gateErrorState
+
+    /** Which target apps get intercepted (ticket 04: user-editable with defaults). */
+    val targets: List<TargetApp> = TargetApps.defaults()
+    private val selectedTargetState = MutableStateFlow(TargetApps.selected(container.appContext).map { it.packageId }.toSet())
+    val selectedTargets: StateFlow<Set<String>> = selectedTargetState
+
+    fun toggleTarget(packageId: String) {
+        val current = selectedTargetState.value
+        val next = if (packageId in current) current - packageId else current + packageId
+        TargetApps.save(container.appContext, next)
+        selectedTargetState.value = next
+    }
 
     private val reviewState = MutableStateFlow(ReviewState())
     val review: StateFlow<ReviewState> = reviewState

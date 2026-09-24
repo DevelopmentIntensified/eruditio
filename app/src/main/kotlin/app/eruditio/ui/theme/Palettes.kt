@@ -52,6 +52,13 @@ val palettes = listOf(
         rule = Color(0xFF1B2A1C), accent = Color(0xFF4CAF50),
         dark = true,
     ),
+    Palette(
+        id = "one-dark", name = "One Dark",
+        bg = Color(0xFF282C34), surface = Color(0xFF21252B),
+        ink = Color(0xFFABB2BF), muted = Color(0xFF5C6370),
+        rule = Color(0xFF3E4451), accent = Color(0xFF61AFEF),
+        dark = true,
+    ),
 )
 
 object Palettes {

@@ -80,6 +80,7 @@ private data class CompletedView(
     val title: String,
     val completed: CompletedSession,
     val handoff: app.eruditio.core.HandoffLink?,
+    val next: app.eruditio.data.TextMeta?,
 )
 
 /** One scroll item: a paragraph, or a single line of an oversized block. */
@@ -208,13 +209,24 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
         }
         Button(
             onClick = {
-                val last = (listState.firstVisibleItemIndex + 8).coerceAtMost(items.size - 1)
-                val end = starts.getOrNull(last + 1) ?: loaded.textLength
+                // "I read to here" = the bottom of what is actually on screen;
+                // a firstVisible+8 heuristic overshot into unread content and
+                // resumed further down than the user had read.
+                val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+                    ?: listState.firstVisibleItemIndex
+                val end = starts.getOrNull(lastVisible + 1) ?: loaded.textLength
                 scope.launch {
                     val done = container.sessions.completeSession(loaded.sessionId, end)
                     if (done != null) {
-                        container.positions.save(loaded.textId, end, last)
-                        onCompleted(CompletedView(loaded.title, done, HandoffShelf.suggest(loaded.group)))
+                        container.positions.save(loaded.textId, end, lastVisible)
+                        // Recommended next reading: another unstarted classic,
+                        // same content group first (in-app momentum over feeds).
+                        val next = container.library.texts.firstOrNull {
+                            it.id != loaded.textId && it.group == loaded.group && container.lastReadPercent(it.id) == 0
+                        } ?: container.library.texts.firstOrNull {
+                            it.id != loaded.textId && container.lastReadPercent(it.id) == 0
+                        }
+                        onCompleted(CompletedView(loaded.title, done, HandoffShelf.suggest(loaded.group), next))
                     }
                 }
             },
@@ -230,6 +242,23 @@ private fun CompletedBody(container: AppContainer, s: CompletedView) {
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Session complete", style = MaterialTheme.typography.headlineMedium)
         Text("${s.title} · +${s.completed.newConcepts} review cards")
+        s.next?.let { next ->
+            val scope = rememberCoroutineScope()
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        when (val start = container.sessions.startSession(next.id, 0L)) {
+                            is app.eruditio.core.SessionStart.Opened -> {
+                                openReader(context, start.sessionId)
+                                (context as? Activity)?.finish()
+                            }
+                            app.eruditio.core.SessionStart.Locked -> Unit
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Read next: ${next.title}") }
+        }
         s.handoff?.let { link ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

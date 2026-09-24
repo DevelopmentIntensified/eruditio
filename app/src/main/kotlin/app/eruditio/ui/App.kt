@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -32,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -68,7 +70,8 @@ fun App(vm: EruditioViewModel) {
                     0 -> HomeScreen(vm, homeState, Modifier.fillMaxSize(), onOpenLibrary = { tab = 1 }, onReview = { tab = 2 })
                     1 -> LibraryScreen(vm, Modifier.fillMaxSize())
                     2 -> ReviewScreen(vm, reviewState, Modifier.fillMaxSize())
-                    3 -> ProgressScreen(vm, progressState, Modifier.fillMaxSize(), onOpenLibrary = { tab = 1 })
+                    3 -> ProgressScreen(progressState, Modifier.fillMaxSize(), onOpenLibrary = { tab = 1 })
+                    4 -> SettingsScreen(vm, Modifier.fillMaxSize())
                 }
             }
             BottomNav(tab) { tab = it; vm.refresh() }
@@ -91,6 +94,7 @@ private fun BottomNav(selected: Int, onSelect: (Int) -> Unit) {
                     Triple(1, "☰", "Library"),
                     Triple(2, "↺", "Review"),
                     Triple(3, "◉", "Progress"),
+                    Triple(4, "⚙", "Settings"),
                 ).forEach { (index, glyph, label) ->
                     val color =
                         if (index == selected) MaterialTheme.colorScheme.onBackground
@@ -152,14 +156,40 @@ private fun HomeScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Recent sessions", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (state.recent.isEmpty()) {
-                    Text("Nothing yet. Open a classic from the Library.", style = MaterialTheme.typography.bodyMedium)
-                }
-                state.recent.forEach { s ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(vm.titleOf(s.textId), style = MaterialTheme.typography.bodyLarge)
-                        Text("read", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Begin here", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val progressById by vm.progressById.collectAsState()
+                    val unstarted = vm.texts.filter { (progressById[it.id] ?: 0) == 0 }.take(3)
+                    if (unstarted.isEmpty()) {
+                        Text("All texts have progress — pick up any classic from the Library.", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    unstarted.forEach { t ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { vm.startReading(t.id) }.padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(t.title, style = MaterialTheme.typography.bodyLarge)
+                                Text(t.author, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Text(
+                                "start",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                } else {
+                    Text("Recent sessions", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    state.recent.forEach { s ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { vm.startReading(s.textId) }.padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(vm.titleOf(s.textId), style = MaterialTheme.typography.bodyLarge)
+                            Text("resume", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
@@ -242,10 +272,18 @@ private fun HomeScreen(
     }
 }
 
-/** Compact, dense list (variant B) with percent rings (variant C). */
+/** Compact, dense list (variant B) with percent rings (variant C), grouped. */
 @Composable
 private fun LibraryScreen(vm: EruditioViewModel, modifier: Modifier) {
     val progressById by vm.progressById.collectAsState()
+    val sections = remember(vm.texts) {
+        vm.texts.groupBy { it.group }
+    }
+    val sectionTitles = mapOf(
+        "ancient" to "Classics",
+        "christian" to "Christian writing",
+        "biography" to "Lives",
+    )
     Column(
         modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
     ) {
@@ -256,27 +294,35 @@ private fun LibraryScreen(vm: EruditioViewModel, modifier: Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(8.dp))
-        vm.texts.forEach { t ->
-            val pct = progressById[t.id] ?: 0
-            Row(
-                Modifier.fillMaxWidth().clickable { vm.startReading(t.id) }.padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(t.title, style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        t.author,
+        sections.forEach { (group, texts) ->
+            Text(
+                sectionTitles[group] ?: group.replaceFirstChar { it.uppercase() },
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+            )
+            texts.forEach { t ->
+                val pct = progressById[t.id] ?: 0
+                Row(
+                    Modifier.fillMaxWidth().clickable { vm.startReading(t.id) }.padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(t.title, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            t.author,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (pct > 0) Ring(pct / 100f) else Text(
+                        "unread",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (pct > 0) Ring(pct / 100f) else Text(
-                    "unread",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
             }
-            HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
         }
     }
 }
@@ -328,13 +374,10 @@ private fun ReviewScreen(vm: EruditioViewModel, state: EruditioViewModel.ReviewS
 
 @Composable
 private fun ProgressScreen(
-    vm: EruditioViewModel,
     state: EruditioViewModel.ProgressState,
     modifier: Modifier,
     onOpenLibrary: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val palette by vm.palette.collectAsState()
     Column(
         modifier.verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -362,13 +405,66 @@ private fun ProgressScreen(
             }
         }
         Text("🔥 Streak: ${state.streak} day(s) — habit, not mastery", style = MaterialTheme.typography.bodyLarge)
-        ThemePicker(vm, palette)
+        OutlinedButton(onClick = onOpenLibrary, modifier = Modifier.fillMaxWidth()) { Text("Open Library") }
+    }
+}
+
+/** Settings: theme, intercepted apps, debug surfaces. */
+@Composable
+private fun SettingsScreen(vm: EruditioViewModel, modifier: Modifier) {
+    val context = LocalContext.current
+    Column(
+        modifier.verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text("Settings", style = MaterialTheme.typography.headlineMedium)
+        Card(
+            Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                val palette by vm.palette.collectAsState()
+                Text("Theme", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                ThemePicker(vm, palette)
+            }
+        }
+        Card(
+            Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                val selected by vm.selectedTargets.collectAsState()
+                Text("Intercepted apps", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "The pause screen appears when one of these opens.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                vm.targets.forEach { app ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { vm.toggleTarget(app.packageId) }.padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = app.packageId in selected,
+                            onCheckedChange = { vm.toggleTarget(app.packageId) },
+                        )
+                        Text(app.label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+                if (selected.isEmpty()) {
+                    Text(
+                        "No apps selected — interception is idle.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
         if (BuildConfig.DEBUG) {
             TextButton(onClick = { context.startActivity(Intent(context, DebugDueActivity::class.java)) }) {
                 Text("Debug: synthetic ledger due set")
             }
         }
-        OutlinedButton(onClick = onOpenLibrary, modifier = Modifier.fillMaxWidth()) { Text("Open Library") }
     }
 }
 
