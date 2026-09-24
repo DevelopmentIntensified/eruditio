@@ -6,9 +6,12 @@ import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -283,6 +289,12 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
         }
     }
 
+    // Rail state: checkpoint item indexes and the togglable on/off.
+    val railEnabled by container.reading.railEnabled.collectAsState()
+    val checkpointIndexes = remember(items) {
+        items.indices.filter { it % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1 }.toIntArray()
+    }
+
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 24.dp)) {
             Text(loaded.title, style = MaterialTheme.typography.titleLarge)
@@ -290,11 +302,12 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
                 Text(loaded.author, style = MaterialTheme.typography.labelMedium)
             }
         }
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(24.dp),
-        ) {
+        Row(Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(24.dp),
+            ) {
             items(items.size) { i ->
                 val item = items[i]
                 Row(
@@ -320,6 +333,15 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
                     )
                 }
             }
+            }
+            Rail(
+                checkpoints = checkpointIndexes,
+                itemCount = items.size,
+                listState = listState,
+                enabled = railEnabled,
+                scope = scope,
+                modifier = Modifier.width(22.dp).fillMaxHeight(),
+            )
         }
         // Quiet, sticky, not a nag: the chip exists only while a checkpoint is
         // actually on screen, then disappears with it.
@@ -355,6 +377,81 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
             },
             modifier = Modifier.fillMaxWidth().padding(20.dp),
         ) { Text("Check in — I read to here") }
+    }
+}
+
+@Composable
+private fun Rail(
+    checkpoints: IntArray,
+    itemCount: Int,
+    listState: LazyListState,
+    enabled: Boolean,
+    scope: kotlinx.coroutines.CoroutineScope,
+    modifier: Modifier,
+) {
+    if (!enabled || itemCount <= 1) return
+
+    // The rail tracks the SAME anchor as the resume pipeline: the first visible
+    // item. Derived state keeps recomposition off the hot scroll path.
+    val firstVisible by remember(listState) {
+        derivedStateOf { listState.firstVisibleItemIndex }
+    }
+
+    var dragging by remember { mutableStateOf(false) }
+
+    val trackColor = MaterialTheme.colorScheme.outlineVariant
+    val tickColor = MaterialTheme.colorScheme.outline
+    val passedTickColor = MaterialTheme.colorScheme.primary
+    val markerColor = MaterialTheme.colorScheme.primary
+
+    val jump: (androidx.compose.ui.unit.IntSize, Float) -> Unit = { size, y ->
+        val fraction = (y / size.height).coerceIn(0f, 0.999f)
+        val target = (fraction * itemCount).toInt().coerceAtMost(itemCount - 1)
+        scope.launch { listState.scrollToItem(target) }
+    }
+
+    Box(
+        modifier
+            .pointerInput(itemCount) {
+                detectTapGestures { offset -> jump(size, offset.y) }
+            }
+            .pointerInput(itemCount) {
+                detectVerticalDragGestures(
+                    onDragStart = { dragging = true },
+                    onDragEnd = { dragging = false },
+                    onDragCancel = { dragging = false },
+                ) { change, _ ->
+                    jump(size, change.position.y)
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        // 6dp visual column, centered in the wider gesture strip.
+        androidx.compose.foundation.Canvas(Modifier.fillMaxHeight().width(6.dp)) {
+            val w = size.width
+            val h = size.height
+            drawLine(
+                color = trackColor,
+                start = Offset(w / 2f, 0f),
+                end = Offset(w / 2f, h),
+                strokeWidth = w * 0.34f,
+            )
+            val markerFraction = firstVisible.toFloat() / itemCount
+            for (index in checkpoints) {
+                val passed = index <= firstVisible
+                drawLine(
+                    color = if (passed) passedTickColor else tickColor,
+                    start = Offset(0f, index / itemCount.toFloat() * h),
+                    end = Offset(w, index / itemCount.toFloat() * h),
+                    strokeWidth = if (passed) w * 0.8f else w * 0.55f,
+                )
+            }
+            drawCircle(
+                color = markerColor,
+                radius = w * 0.9f,
+                center = Offset(w / 2f, markerFraction * h),
+            )
+        }
     }
 }
 
