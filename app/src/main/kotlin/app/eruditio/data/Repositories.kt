@@ -21,6 +21,10 @@ class DeviceClock(private val zone: ZoneId = ZoneId.systemDefault()) : Clock {
     override val epochMillis: Long get() = System.currentTimeMillis()
     override val epochDay: Long
         get() = Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate().toEpochDay()
+
+    /** Local start-of-today, for "minutes today" style stats. */
+    fun startOfDayMillis(): Long =
+        java.time.LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
 }
 
 class RoomLedgerStore(private val dao: LedgerDao) : LedgerStore {
@@ -56,6 +60,16 @@ class RoomSessionLog(private val dao: SessionDao) : SessionLog {
         }
 
     override suspend fun completedEpochDays(): Set<Long> = dao.completedEpochDays().toSet()
+
+    override suspend fun countCompletedSince(fromEpochDay: Long): Int = dao.countCompletedSince(fromEpochDay)
+
+    override suspend fun addReadingTime(sessionId: Long, deltaMillis: Long) {
+        if (deltaMillis > 0) dao.addReadingTime(sessionId, deltaMillis)
+    }
+
+    override suspend fun totalReadMillis(): Long = dao.totalReadMillis()
+
+    override suspend fun readMillisSince(sinceMillis: Long): Long = dao.readMillisSince(sinceMillis)
 
     override suspend fun complete(sessionId: Long, endChar: Long, atMillis: Long, epochDay: Long) =
         dao.complete(sessionId, endChar, atMillis, epochDay)

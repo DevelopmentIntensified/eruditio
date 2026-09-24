@@ -131,6 +131,21 @@ private fun HomeScreen(
         Text("Eruditio", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Today", style = MaterialTheme.typography.headlineMedium)
 
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("Sessions this week", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${state.sessionsThisWeek}", style = MaterialTheme.typography.headlineSmall)
+                }
+            }
+            Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("Reading today", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(fmtMinutes(state.minutesToday), style = MaterialTheme.typography.headlineSmall)
+                }
+            }
+        }
+
         Card(
             Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -372,6 +387,12 @@ private fun ReviewScreen(vm: EruditioViewModel, state: EruditioViewModel.ReviewS
     }
 }
 
+private fun fmtMinutes(minutes: Long): String =
+    when {
+        minutes >= 60 -> "${minutes / 60}h ${minutes % 60}m"
+        else -> "${minutes}m"
+    }
+
 @Composable
 private fun ProgressScreen(
     state: EruditioViewModel.ProgressState,
@@ -402,6 +423,9 @@ private fun ProgressScreen(
                 Text("This week", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Openings intercepted: ${state.weekly}")
                 Text("Readings that replaced them: ${state.replaced}")
+                Text(
+                    "Time reading: ${fmtMinutes(state.minutesReadingWeek)} this week · ${fmtMinutes(state.minutesReadingTotal)} all time",
+                )
             }
         }
         Text("🔥 Streak: ${state.streak} day(s) — habit, not mastery", style = MaterialTheme.typography.bodyLarge)

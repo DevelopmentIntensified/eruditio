@@ -37,6 +37,8 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         val recent: List<SessionRecord> = emptyList(),
         val hasUsageAccess: Boolean = false,
         val canDrawOverlays: Boolean = false,
+        val sessionsThisWeek: Int = 0,
+        val minutesToday: Long = 0L,
     )
 
     data class ReviewState(
@@ -49,6 +51,8 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
     data class ProgressState(
         val textsInProgress: Int = 0,
         val textsReadThrough: Int = 0,
+        val minutesReadingWeek: Long = 0L,
+        val minutesReadingTotal: Long = 0L,
         val familiar: Int = 0,
         val proficient: Int = 0,
         val mastered: Int = 0,
@@ -104,6 +108,8 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
                 recent = container.sessionLog.recent(5),
                 hasUsageAccess = container.hasUsageAccess,
                 canDrawOverlays = container.canDrawOverlays,
+                sessionsThisWeek = container.sessions.weeklySessions(),
+                minutesToday = container.sessions.minutesToday(),
             )
             textProgress.value = texts.associate { it.id to container.lastReadPercent(it.id) }
             refreshReview()
@@ -144,9 +150,12 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
             val all = container.ledger.all()
             val textsWithProgress = texts.count { (progressById.value[it.id] ?: 0) > 0 }
             val readThrough = texts.count { (progressById.value[it.id] ?: 0) >= 100 }
+            val (weekMillis, totalMillis) = container.sessions.readingMinutes()
             progressState.value = ProgressState(
                 textsInProgress = textsWithProgress,
                 textsReadThrough = readThrough,
+                minutesReadingWeek = weekMillis / 60_000,
+                minutesReadingTotal = totalMillis / 60_000,
                 familiar = all.count { container.scheduler.effectiveMastery(it, container.today()) == MasteryLevel.FAMILIAR },
                 proficient = all.count { container.scheduler.effectiveMastery(it, container.today()) == MasteryLevel.PROFICIENT },
                 mastered = all.count { container.scheduler.effectiveMastery(it, container.today()) == MasteryLevel.MASTERED },

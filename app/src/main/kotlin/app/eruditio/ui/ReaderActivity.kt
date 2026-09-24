@@ -1,9 +1,9 @@
 package app.eruditio.ui
 
 import android.app.Activity
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,11 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.net.toUri
 import app.eruditio.AppContainer
 import app.eruditio.EruditioApp
 import app.eruditio.core.CompletedSession
-import app.eruditio.core.HandoffShelf
 import app.eruditio.ui.theme.EruditioTheme
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
@@ -44,10 +42,36 @@ import kotlinx.coroutines.launch
 
 /**
  * The quiet reading surface (spec): full-bleed text, no feeds, no adjacency.
- * Position memory across restarts; check-in records the completed segment and
- * produces the post-session handoff suggestion. Both entry paths land here.
+ * Position memory across restarts; check-in records the completed segment.
+ * Time actually spent in the surface is accumulated on pause (progress: time
+ * learning, not scrolling). Both entry paths land here.
  */
 class ReaderActivity : androidx.activity.ComponentActivity() {
+
+    private var readingSince: Long? = null
+
+    override fun onResume() {
+        super.onResume()
+        readingSince = System.currentTimeMillis()
+    }
+
+    override fun onPause() {
+        flushReadingTime()
+        super.onPause()
+    }
+
+    /** Time learning, not scrolling: accumulated only while the reader shows. */
+    private fun flushReadingTime() {
+        val since = readingSince ?: return
+        readingSince = null
+        val sessionId = intent.getLongExtra(EXTRA_SESSION_ID, -1L)
+        if (sessionId <= 0L) return
+        val spent = System.currentTimeMillis() - since
+        val container = (application as EruditioApp).container
+        lifecycleScope.launch {
+            container.sessionLog.addReadingTime(sessionId, spent)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,7 +103,6 @@ private data class Loaded(
 private data class CompletedView(
     val title: String,
     val completed: CompletedSession,
-    val handoff: app.eruditio.core.HandoffLink?,
     val next: app.eruditio.data.TextMeta?,
 )
 
@@ -209,16 +232,17 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
         }
         Button(
             onClick = {
-                // "I read to here" = the bottom of what is actually on screen;
-                // a firstVisible+8 heuristic overshot into unread content and
-                // resumed further down than the user had read.
+                // "I read to here" = the bottom of what is actually on screen.
+                // The saved resume point is the last VISIBLE line itself, so a
+                // reopen lands on the exact line checked in at, not past it.
                 val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
                     ?: listState.firstVisibleItemIndex
                 val end = starts.getOrNull(lastVisible + 1) ?: loaded.textLength
                 scope.launch {
                     val done = container.sessions.completeSession(loaded.sessionId, end)
                     if (done != null) {
-                        container.positions.save(loaded.textId, end, lastVisible)
+                        val resumeStart = items[lastVisible].startChar
+                        container.positions.save(loaded.textId, resumeStart, lastVisible)
                         // Recommended next reading: another unstarted classic,
                         // same content group first (in-app momentum over feeds).
                         val next = container.library.texts.firstOrNull {
@@ -226,7 +250,7 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
                         } ?: container.library.texts.firstOrNull {
                             it.id != loaded.textId && container.lastReadPercent(it.id) == 0
                         }
-                        onCompleted(CompletedView(loaded.title, done, HandoffShelf.suggest(loaded.group), next))
+                        onCompleted(CompletedView(loaded.title, done, next))
                     }
                 }
             },
@@ -258,18 +282,6 @@ private fun CompletedBody(container: AppContainer, s: CompletedView) {
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Read next: ${next.title}") }
-        }
-        s.handoff?.let { link ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("One next step", style = MaterialTheme.typography.labelMedium)
-                    Text(link.title, style = MaterialTheme.typography.bodyLarge)
-                    OutlinedButton(onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, link.url.toUri()))
-                    }) { Text("Open") }
-                    Text("Shown only right after a session.", style = MaterialTheme.typography.labelSmall)
-                }
-            }
         }
         Button(onClick = { (context as? Activity)?.finish() }, modifier = Modifier.fillMaxWidth()) { Text("Done") }
     }

@@ -53,6 +53,7 @@ class FakeInterceptionLog : InterceptionLog {
 
 class FakeSessionLog : SessionLog {
     private val sessions = mutableMapOf<Long, SessionRecord>()
+    private val readTimes = mutableMapOf<Long, Long>()
 
     override suspend fun start(textId: String, startChar: Long, epochDay: Long, atMillis: Long): Long {
         val id = sessions.size.toLong() + 1
@@ -73,6 +74,18 @@ class FakeSessionLog : SessionLog {
 
     override suspend fun completedEpochDays(): Set<Long> =
         sessions.values.mapNotNull { it.completedEpochDay }.toSet()
+
+    override suspend fun countCompletedSince(fromEpochDay: Long): Int =
+        sessions.values.count { (it.completedEpochDay ?: Long.MIN_VALUE) >= fromEpochDay }
+
+    override suspend fun addReadingTime(sessionId: Long, deltaMillis: Long) {
+        if (deltaMillis > 0) readTimes.merge(sessionId, deltaMillis, Long::plus)
+    }
+
+    override suspend fun totalReadMillis(): Long = readTimes.values.sum()
+
+    override suspend fun readMillisSince(sinceMillis: Long): Long =
+        sessions.values.filter { it.startedAtMillis >= sinceMillis }.sumOf { readTimes[it.sessionId] ?: 0L }
 }
 
 class FakeConceptSource : ConceptSource {

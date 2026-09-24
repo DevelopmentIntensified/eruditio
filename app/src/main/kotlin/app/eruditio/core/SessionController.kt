@@ -120,6 +120,16 @@ class SessionController(
 
     /** Of this week's interceptions, how many became reading sessions. */
     suspend fun weeklyReplaced(): Int = interceptionLog.weeklyReplaced(clock.epochDay)
+
+    /** Completed sessions in the trailing 7 days. */
+    suspend fun weeklySessions(): Int = sessionLog.countCompletedSince(clock.epochDay - 6)
+
+    /** Minutes actually spent reading, this trailing week and all time. */
+    suspend fun readingMinutes(): Pair<Long, Long> =
+        sessionLog.readMillisSince((clock.epochDay - 6) * 86_400_000L) to sessionLog.totalReadMillis()
+
+    suspend fun minutesToday(): Long =
+        sessionLog.readMillisSince(clock.epochDay * 86_400_000L)
 }
 
 /* ----- stores behind the seam (implemented in the data layer, faked in tests) ----- */
@@ -147,6 +157,14 @@ interface SessionLog {
     suspend fun complete(sessionId: Long, endChar: Long, atMillis: Long, epochDay: Long)
     suspend fun recent(limit: Int): List<SessionRecord>
     suspend fun completedEpochDays(): Set<Long>
+    suspend fun countCompletedSince(fromEpochDay: Long): Int
+
+    /** Time actually spent in the reading surface, accumulated on leave. */
+    suspend fun addReadingTime(sessionId: Long, deltaMillis: Long)
+    suspend fun totalReadMillis(): Long
+
+    /** Reading time across sessions started at/after `sinceMillis`. */
+    suspend fun readMillisSince(sinceMillis: Long): Long
 }
 
 /** Segment-derived review concepts (spec: review items derive from completed segments). */

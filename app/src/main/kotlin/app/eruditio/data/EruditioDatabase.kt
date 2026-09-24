@@ -30,6 +30,7 @@ data class SessionEntity(
     val startedAtMillis: Long,
     val completedAtMillis: Long? = null,
     val completedEpochDay: Long? = null,
+    val readMillis: Long = 0,
 )
 
 @Entity(tableName = "interceptions")
@@ -94,6 +95,18 @@ interface SessionDao {
 
     @Query("SELECT DISTINCT completedEpochDay FROM sessions WHERE completedEpochDay IS NOT NULL")
     suspend fun completedEpochDays(): List<Long>
+
+    @Query("SELECT COUNT(*) FROM sessions WHERE completedEpochDay >= :fromEpochDay")
+    suspend fun countCompletedSince(fromEpochDay: Long): Int
+
+    @Query("UPDATE sessions SET readMillis = readMillis + :delta WHERE sessionId = :id")
+    suspend fun addReadingTime(id: Long, delta: Long)
+
+    @Query("SELECT COALESCE(SUM(readMillis), 0) FROM sessions")
+    suspend fun totalReadMillis(): Long
+
+    @Query("SELECT COALESCE(SUM(readMillis), 0) FROM sessions WHERE startedAtMillis >= :sinceMillis")
+    suspend fun readMillisSince(sinceMillis: Long): Long
 }
 
 @Dao

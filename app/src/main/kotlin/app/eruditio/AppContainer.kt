@@ -36,6 +36,8 @@ class AppContainer(private val app: Application) {
     val hasUsageAccess: Boolean get() = MainActivity.hasUsageAccess(app)
     val canDrawOverlays: Boolean get() = MainActivity.canDrawOverlays(app)
     fun today(): Long = clock.epochDay
+    fun todayStartMillis(): Long = clock.startOfDayMillis()
+    fun weekAgoMillis(): Long = System.currentTimeMillis() - 7L * 86_400_000L
 
     val themes = ThemeStore(app)
     val billing = PlayBillingGate(app, trial)
