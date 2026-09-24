@@ -1,6 +1,7 @@
 package app.eruditio.ui
 
 import android.content.Intent
+import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -116,6 +117,9 @@ private fun HomeScreen(
     onReview: () -> Unit,
 ) {
     val context = LocalContext.current
+    val activity = context as? Activity
+    val gateLocked by vm.gateLocked.collectAsState()
+    val gateError by vm.gateError.collectAsState()
     Column(
         modifier.verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -156,6 +160,34 @@ private fun HomeScreen(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(vm.titleOf(s.textId), style = MaterialTheme.typography.bodyLarge)
                         Text("read", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        if (gateLocked) {
+            Card(
+                Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Your reading trial is complete", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Buy Eruditio once — it is yours. No subscription, ever.", style = MaterialTheme.typography.bodyMedium)
+                    Button(
+                        onClick = { activity?.let { vm.purchase(it) } },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
+                    ) { Text("Unlock Eruditio") }
+                    TextButton(onClick = { vm.restorePurchase() }) { Text("Restore purchase") }
+                    gateError?.let { message ->
+                        Text(
+                            message,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
                     }
                 }
             }
@@ -316,6 +348,7 @@ private fun ProgressScreen(
                 Text("Concepts by mastery", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("familiar ${state.familiar} · proficient ${state.proficient} · mastered ${state.mastered}")
                 Text("Reviews due: ${state.dueCount}")
+                Text("Texts started: ${state.textsInProgress} · read through: ${state.textsReadThrough}")
             }
         }
         Card(

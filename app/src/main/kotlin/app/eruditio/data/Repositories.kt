@@ -11,6 +11,8 @@ import app.eruditio.core.ConceptSource
 import app.eruditio.core.SessionLog
 import app.eruditio.core.SessionRecord
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
@@ -121,6 +123,9 @@ class EntitlementRepository(private val dao: EntitlementDao) : EntitlementStore 
 
     override suspend fun save(entitlement: Entitlement) =
         dao.upsert(EntitlementEntity(owned = entitlement.owned, freeSessionsUsed = entitlement.freeSessionsUsed))
+
+    /** Reactive entitlement for the UI; purchase completion flips the gate live. */
+    fun observe(): Flow<Entitlement> = dao.observe().map { it?.toEntitlement() ?: Entitlement() }
 }
 
 class ReadingPositions(private val dao: ReadingPositionDao) {

@@ -10,6 +10,7 @@ import app.eruditio.core.SessionLog
 import app.eruditio.core.TrialGate
 import app.eruditio.data.DeviceClock
 import app.eruditio.data.EruditioDatabase
+import app.eruditio.data.PlayBillingGate
 import app.eruditio.data.EntitlementRepository
 import app.eruditio.data.RoomInterceptionLog
 import app.eruditio.data.RoomLedgerStore
@@ -28,7 +29,8 @@ class AppContainer(private val app: Application) {
 
     private val db = EruditioDatabase.build(app)
     private val clock = DeviceClock()
-    private val trial = TrialGate(EntitlementRepository(db.entitlementDao()), isDebug = BuildConfig.DEBUG)
+    val entitlements = EntitlementRepository(db.entitlementDao())
+    val trial = TrialGate(entitlements, isDebug = BuildConfig.DEBUG)
 
     val appContext: Context get() = app
     val hasUsageAccess: Boolean get() = MainActivity.hasUsageAccess(app)
@@ -36,6 +38,7 @@ class AppContainer(private val app: Application) {
     fun today(): Long = clock.epochDay
 
     val themes = ThemeStore(app)
+    val billing = PlayBillingGate(app, trial)
     val positions = ReadingPositions(db.readingPositionDao())
     val interceptionLog = RoomInterceptionLog(db.interceptionDao())
     val scheduler = ReviewScheduler()

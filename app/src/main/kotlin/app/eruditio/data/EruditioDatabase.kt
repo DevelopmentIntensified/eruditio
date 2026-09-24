@@ -11,6 +11,7 @@ import app.eruditio.core.Entitlement
 import app.eruditio.core.LedgerEntry
 import app.eruditio.core.InterceptionResult
 import app.eruditio.core.SessionRecord
+import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "reading_positions")
 data class ReadingPositionEntity(
@@ -132,6 +133,9 @@ interface LedgerDao {
 interface EntitlementDao {
     @Query("SELECT * FROM entitlement WHERE id = 0")
     suspend fun get(): EntitlementEntity?
+
+    @Query("SELECT * FROM entitlement WHERE id = 0")
+    fun observe(): Flow<EntitlementEntity?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entitlement: EntitlementEntity)

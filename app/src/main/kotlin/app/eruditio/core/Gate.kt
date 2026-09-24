@@ -17,11 +17,7 @@ data class Entitlement(
 )
 
 class TrialGate(private val store: EntitlementStore, private val isDebug: Boolean) {
-    suspend fun unlocked(): Boolean {
-        if (isDebug) return true
-        val e = store.entitlement()
-        return e.owned || e.freeSessionsUsed < FREE_SESSION_LIMIT
-    }
+    suspend fun unlocked(): Boolean = isDebug || isUnlocked(store.entitlement())
 
     suspend fun markSessionCompleted() {
         if (isDebug) return
@@ -38,5 +34,8 @@ class TrialGate(private val store: EntitlementStore, private val isDebug: Boolea
 
     companion object {
         const val FREE_SESSION_LIMIT = 3
+
+        /** The one unlock rule; TrialGate and the UI flow both read this. */
+        fun isUnlocked(e: Entitlement) = e.owned || e.freeSessionsUsed < FREE_SESSION_LIMIT
     }
 }

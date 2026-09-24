@@ -1,21 +1,32 @@
 package app.eruditio.ui
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.eruditio.AppContainer
+import app.eruditio.core.Entitlement
 import app.eruditio.core.LedgerEntry
 import app.eruditio.core.MasteryLevel
 import app.eruditio.core.RecallGrade
 import app.eruditio.core.SessionRecord
 import app.eruditio.core.SessionStart
+import app.eruditio.core.TrialGate
 import app.eruditio.ui.theme.Palette
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class EruditioViewModel(private val container: AppContainer) : ViewModel() {
+
+    init {
+        if (!app.eruditio.BuildConfig.DEBUG) container.billing.connect()
+    }
 
     val texts = container.library.texts
 
@@ -34,6 +45,8 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
     )
 
     data class ProgressState(
+        val textsInProgress: Int = 0,
+        val textsReadThrough: Int = 0,
         val familiar: Int = 0,
         val proficient: Int = 0,
         val mastered: Int = 0,
@@ -49,6 +62,17 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
     val palette: StateFlow<Palette> = container.themes.palette
 
     fun selectTheme(palette: Palette) = container.themes.select(palette)
+
+    /** The one unlock rule (TrialGate.isUnlocked), observed reactively so a
+     *  completed purchase unlocks the Home card without a manual refresh. */
+    val gateLocked: StateFlow<Boolean> =
+        (if (app.eruditio.BuildConfig.DEBUG) flowOf(Entitlement(owned = true))
+        else container.entitlements.observe())
+            .map { !TrialGate.isUnlocked(it) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, app.eruditio.BuildConfig.DEBUG)
+
+    private val gateErrorState = MutableStateFlow<String?>(null)
+    val gateError: StateFlow<String?> = gateErrorState
 
     private val reviewState = MutableStateFlow(ReviewState())
     val review: StateFlow<ReviewState> = reviewState
@@ -73,6 +97,21 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    /** Billing flow; debug builds bypass the gate entirely. */
+    fun purchase(activity: Activity) {
+        viewModelScope.launch {
+            gateErrorState.value = null
+            container.billing.launchPurchase(activity) { message -> gateErrorState.value = message }
+        }
+    }
+
+    fun restorePurchase() {
+        viewModelScope.launch {
+            gateErrorState.value = null
+            container.billing.restore()
+        }
+    }
+
     private fun refreshReview() {
         viewModelScope.launch {
             val due = container.sessions.dueToday()
@@ -89,7 +128,11 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
     private fun refreshProgress() {
         viewModelScope.launch {
             val all = container.ledger.all()
+            val textsWithProgress = texts.count { (progressById.value[it.id] ?: 0) > 0 }
+            val readThrough = texts.count { (progressById.value[it.id] ?: 0) >= 100 }
             progressState.value = ProgressState(
+                textsInProgress = textsWithProgress,
+                textsReadThrough = readThrough,
                 familiar = all.count { container.scheduler.effectiveMastery(it, container.today()) == MasteryLevel.FAMILIAR },
                 proficient = all.count { container.scheduler.effectiveMastery(it, container.today()) == MasteryLevel.PROFICIENT },
                 mastered = all.count { container.scheduler.effectiveMastery(it, container.today()) == MasteryLevel.MASTERED },
@@ -110,7 +153,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
             val startChar = container.positions.restore(textId)?.charOffset ?: 0L
             when (val start = container.sessions.startSession(textId, startChar)) {
                 is SessionStart.Opened -> openReader(container.appContext, start.sessionId)
-                SessionStart.Locked -> Unit // billing gate surface arrives with ticket 10
+                SessionStart.Locked -> refresh() // trial over: the purchase card surfaces on Home
             }
         }
     }
