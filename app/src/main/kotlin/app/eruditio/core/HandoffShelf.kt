@@ -8,21 +8,17 @@ package app.eruditio.core
 data class HandoffLink(val title: String, val url: String)
 
 object HandoffShelf {
-    // Content groups carried by the text index; one curated destination each.
-    private const val GROUP_ANCIENT = "ancient"
-    private const val GROUP_CHRISTIAN = "christian"
-    private const val GROUP_BIOGRAPHY = "biography"
-
+    // One curated destination per content group (tokens defined in Groups).
     private val byGroup = mapOf(
-        GROUP_ANCIENT to HandoffLink(
+        Groups.ANCIENT to HandoffLink(
             "World History: Beginnings",
             "https://www.khanacademy.org/humanities/world-history/world-history-beginnings",
         ),
-        GROUP_CHRISTIAN to HandoffLink(
+        Groups.CHRISTIAN to HandoffLink(
             "Grammar foundations",
             "https://www.khanacademy.org/humanities/grammar",
         ),
-        GROUP_BIOGRAPHY to HandoffLink(
+        Groups.BIOGRAPHY to HandoffLink(
             "Kotlin track on Exercism",
             "https://exercism.org/tracks/kotlin",
         ),

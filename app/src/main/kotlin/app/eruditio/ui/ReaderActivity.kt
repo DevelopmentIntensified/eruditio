@@ -67,6 +67,7 @@ import app.eruditio.EruditioApp
 import app.eruditio.MainActivity
 import app.eruditio.R
 import app.eruditio.core.CompletedSession
+import app.eruditio.core.Groups
 import app.eruditio.ui.theme.EruditioTheme
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
@@ -196,7 +197,7 @@ private fun isCheckpoint(textItemIndex: Int) =
 
 /**
  * Plate frontispiece (ticket 21): ancient-track texts (TextMeta.group ==
- * "ancient") prepend ONE plate item before all text items, like a book
+ * Groups.ANCIENT) prepend ONE plate item before all text items, like a book
  * frontispiece. Every persisted position — resume saves, checkpoints, rail
  * ticks — stays in TEXT-item space, so checkpoint math and the anchor
  * contract are untouched; the offset is applied only at the scroll
@@ -207,7 +208,7 @@ private const val PLATE_ITEM_COUNT = 1
 
 /** Header offset for this text: 1 plate item for the ancient track, else 0. */
 private val Loaded.plateOffset: Int
-    get() = if (group == "ancient") PLATE_ITEM_COUNT else 0
+    get() = if (group == Groups.ANCIENT) PLATE_ITEM_COUNT else 0
 
 /**
  * Single source for the plate-offset boundary arithmetic: every scroll-list

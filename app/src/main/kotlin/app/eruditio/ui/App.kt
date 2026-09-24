@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import app.eruditio.BuildConfig
+import app.eruditio.core.Groups
 import app.eruditio.core.RecallGrade
 import app.eruditio.core.WeekDot
 import app.eruditio.ui.theme.EruditioTheme
@@ -311,9 +312,9 @@ private fun HomeScreen(
 /** Library segment bar: content groups, cycled by tap (variant B). */
 private enum class Segment(val label: String, val group: String?) {
     All("All", null),
-    Classics("Classics", "ancient"),
-    Christian("Christian", "christian"),
-    Lives("Lives", "biography"),
+    Classics("Classics", Groups.ANCIENT),
+    Christian("Christian", Groups.CHRISTIAN),
+    Lives("Lives", Groups.BIOGRAPHY),
 }
 
 /** Progress pill modes: read percent (0..100) decides inclusion. */
