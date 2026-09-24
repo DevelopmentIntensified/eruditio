@@ -40,6 +40,7 @@ class AppContainer(private val app: Application) {
     fun weekAgoMillis(): Long = System.currentTimeMillis() - 7L * 86_400_000L
 
     val themes = ThemeStore(app)
+    val reading = ReadingSettings(app)
     val billing = PlayBillingGate(app, trial)
     val positions = ReadingPositions(db.readingPositionDao())
     val interceptionLog = RoomInterceptionLog(db.interceptionDao())
