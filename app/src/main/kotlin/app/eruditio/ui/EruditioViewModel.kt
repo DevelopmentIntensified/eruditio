@@ -8,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import app.eruditio.AppContainer
 import app.eruditio.core.Entitlement
 import app.eruditio.core.LedgerEntry
-import app.eruditio.core.MasteryLevel
 import app.eruditio.core.RecallGrade
 import app.eruditio.core.SessionRecord
 import app.eruditio.core.SessionStart
@@ -115,13 +114,14 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             homeState.value = HomeState(
                 due = container.sessions.dueToday().size,
-                recent = container.sessionLog.recent(5),
+                recent = container.sessions.recentSessions(5),
                 hasUsageAccess = container.hasUsageAccess,
                 canDrawOverlays = container.canDrawOverlays,
                 sessionsThisWeek = container.sessions.weeklySessions(),
                 minutesToday = container.sessions.minutesToday(),
             )
-            textProgress.value = texts.associate { it.id to container.lastReadPercent(it.id) }
+            textProgress.value =
+                texts.associate { it.id to container.sessions.readPercent(it.id, container.textLength(it.id)) }
             refreshReview()
             refreshProgress()
         }
@@ -167,7 +167,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
 
     private fun refreshProgress() {
         viewModelScope.launch {
-            val all = container.ledger.all()
+            val mastery = container.sessions.masteryCounts()
             val textsWithProgress = texts.count { (progressById.value[it.id] ?: 0) > 0 }
             val readThrough = texts.count { (progressById.value[it.id] ?: 0) >= 100 }
             // readingMinutes() returns MINUTES (the seam divides ms itself).
@@ -177,9 +177,9 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
                 textsReadThrough = readThrough,
                 minutesReadingWeek = weekMinutes,
                 minutesReadingTotal = totalMinutes,
-                familiar = all.count { container.scheduler.effectiveMastery(it, container.today()) == MasteryLevel.FAMILIAR },
-                proficient = all.count { container.scheduler.effectiveMastery(it, container.today()) == MasteryLevel.PROFICIENT },
-                mastered = all.count { container.scheduler.effectiveMastery(it, container.today()) == MasteryLevel.MASTERED },
+                familiar = mastery.familiar,
+                proficient = mastery.proficient,
+                mastered = mastery.mastered,
                 dueCount = container.sessions.dueToday().size,
                 weekly = container.sessions.weeklyInterceptions(),
                 replaced = container.sessions.weeklyReplaced(),

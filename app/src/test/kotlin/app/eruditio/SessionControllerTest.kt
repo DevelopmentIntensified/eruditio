@@ -2,6 +2,8 @@ package app.eruditio
 
 import app.eruditio.core.InterceptionDecision
 import app.eruditio.core.InterceptionResult
+import app.eruditio.core.LedgerEntry
+import app.eruditio.core.MasteryCounts
 import app.eruditio.core.PositionStore
 import app.eruditio.core.ReviewScheduler
 import app.eruditio.core.SessionController
@@ -227,6 +229,58 @@ class SessionControllerTest {
         val controller = makeController().second
         val opened = controller.openSession("demo:republic") as SessionStart.Opened
         assertEquals(0L, sessionLog.get(opened.sessionId)!!.startChar)
+    }
+
+    @Test
+    fun `recentSessions returns at most the requested number of completed sessions`() = runTest {
+        val controller = makeController().second
+        repeat(3) {
+            val opened = controller.openSession("demo:apology") as SessionStart.Opened
+            controller.completeSession(opened.sessionId, 900)
+        }
+        assertEquals(2, controller.recentSessions(2).size)
+        assertEquals(3, controller.recentSessions(5).size)
+        assertEquals(0, controller.recentSessions(0).size)
+    }
+
+    @Test
+    fun `sessionFor returns the stored session record`() = runTest {
+        val controller = makeController().second
+        val opened = controller.openSession("demo:republic") as SessionStart.Opened
+        val record = controller.sessionFor(opened.sessionId)!!
+        assertEquals("demo:republic", record.textId)
+        assertEquals(null, controller.sessionFor(404L))
+    }
+
+    @Test
+    fun `addReadingTime via the seam lands in the reading-minute totals`() = runTest {
+        val controller = makeController().second
+        val sessionId = (controller.openSession("crito") as SessionStart.Opened).sessionId
+        controller.addReadingTime(sessionId, 120_000L)
+        assertEquals(2L, controller.minutesToday())
+    }
+
+    @Test
+    fun `readPercent reflects the stored offset, capped at 100`() = runTest {
+        val controller = makeController(
+            positionStore = FakePositionStore(mapOf("crito" to 4321L, "over" to 10_500L)),
+        ).second
+        assertEquals(43, controller.readPercent("crito", 10_000))
+        assertEquals(100, controller.readPercent("over", 10_000))
+        assertEquals(0, controller.readPercent("never-read", 10_000)) // no stored position
+        assertEquals(0, controller.readPercent("crito", 0)) // degenerate text length
+    }
+
+    @Test
+    fun `masteryCounts buckets the ledger by decayed mastery`() = runTest {
+        val (clock, controller) = makeController()
+        val today = clock.epochDay
+        ledger.upsert(LedgerEntry(conceptId = "m1", repetitions = 6, lastEpochDay = today)) // mastered, fresh
+        ledger.upsert(LedgerEntry(conceptId = "m2", repetitions = 6, lastEpochDay = today - 91)) // MASTERED decayed -> PROFICIENT
+        ledger.upsert(LedgerEntry(conceptId = "p1", repetitions = 3, lastEpochDay = today)) // proficient, fresh
+        ledger.upsert(LedgerEntry(conceptId = "f1", repetitions = 1, lastEpochDay = today - 31)) // FAMILIAR decayed -> UNSEEN
+        ledger.upsert(LedgerEntry(conceptId = "f2", repetitions = 1, lastEpochDay = today)) // familiar, fresh
+        assertEquals(MasteryCounts(familiar = 1, proficient = 2, mastered = 1), controller.masteryCounts())
     }
 
     @Test

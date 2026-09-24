@@ -17,6 +17,13 @@ enum class MasteryLevel { UNSEEN, FAMILIAR, PROFICIENT, MASTERED }
 
 enum class RecallGrade { AGAIN, HARD, GOOD, EASY }
 
+/** Mastery histogram over the ledger, decay-aware, as the UI surfaces it. */
+data class MasteryCounts(
+    val familiar: Int,
+    val proficient: Int,
+    val mastered: Int,
+)
+
 data class LedgerEntry(
     val conceptId: String,
     val repetitions: Int = 0,

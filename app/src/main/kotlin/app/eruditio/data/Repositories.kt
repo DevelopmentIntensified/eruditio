@@ -143,9 +143,9 @@ class EntitlementRepository(private val dao: EntitlementDao) : EntitlementStore 
     fun observe(): Flow<Entitlement> = dao.observe().map { it?.toEntitlement() ?: Entitlement() }
 }
 
-class ReadingPositions(private val dao: ReadingPositionDao) {
+class ReadingPositions(private val dao: ReadingPositionDao, private val clock: DeviceClock) {
     suspend fun restore(textId: String): ReadingPositionEntity? = dao.get(textId)
     suspend fun lastReadTextId(): String? = dao.latest()?.textId
     suspend fun save(textId: String, charOffset: Long, paragraphIndex: Int) =
-        dao.upsert(ReadingPositionEntity(textId, charOffset, paragraphIndex, System.currentTimeMillis()))
+        dao.upsert(ReadingPositionEntity(textId, charOffset, paragraphIndex, clock.epochMillis))
 }
