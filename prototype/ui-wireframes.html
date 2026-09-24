@@ -1,0 +1,735 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway UI wireframes for Eruditio. Not production code.
+  Three structural variants of every app page, switchable via ?variant= (A/B/C),
+  pages via ?page= (home/library/reader/review/pause/progress/handoff).
+  A floating bar (and ← → keys) cycles variants; page tabs switch screens.
+  Verdict gets folded into the real Compose UI; this file lands on a throwaway branch.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eruditio — UI wireframes (prototype)</title>
+<style>
+  :root{
+    --frame-w: 390px; --frame-h: 800px;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    font-family: Georgia, 'Times New Roman', serif;
+    background:#2b2a27;
+    min-height:100vh;
+    display:flex; flex-direction:column; align-items:center;
+    padding:28px 12px 110px;
+    color:#111;
+  }
+  .proto-tag{
+    color:#b9b4aa; font-family: Verdana, sans-serif; font-size:11px;
+    letter-spacing:.08em; text-transform:uppercase; margin-bottom:14px;
+  }
+  /* ---------- phone frame ---------- */
+  .phone{
+    width:var(--frame-w); height:var(--frame-h);
+    border-radius:38px; padding:14px 10px;
+    background:#0c0c0c;
+    box-shadow:0 30px 60px rgba(0,0,0,.55), inset 0 0 0 2px #222;
+    position:relative;
+  }
+  .screen-area{
+    width:100%; height:100%;
+    border-radius:26px; overflow:hidden; position:relative;
+    background:#faf7f0;
+  }
+  .screen{ display:none; height:100%; overflow-y:auto; }
+  .screen.active{ display:block; }
+  .statusbar{
+    height:26px; display:flex; justify-content:space-between; align-items:center;
+    font-family:Verdana,sans-serif; font-size:10px; padding:0 16px; opacity:.55;
+  }
+  /* ---------- floating switcher ---------- */
+  .switcher{
+    position:fixed; left:50%; bottom:22px; transform:translateX(-50%);
+    background:#111; color:#eee; border-radius:999px;
+    display:flex; align-items:center; gap:10px;
+    padding:10px 14px; font-family:Verdana,sans-serif; font-size:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,.5); z-index:50; flex-wrap:wrap;
+    max-width:94vw; justify-content:center;
+  }
+  .switcher button{
+    background:none; border:0; color:#eee; cursor:pointer;
+    font-size:16px; line-height:1; padding:4px 8px; border-radius:8px;
+  }
+  .switcher button:hover{ background:#333; }
+  .switcher .vname{ min-width:190px; text-align:center; }
+  .switcher .pages{ display:flex; gap:2px; border-left:1px solid #444; padding-left:10px; }
+  .switcher .pages button{ font-size:11px; padding:5px 7px; color:#aaa; }
+  .switcher .pages button.on{ color:#fff; background:#3a3a3a; }
+</style>
+
+<!-- ============ variant-specific stylesheets ============ -->
+<style>
+  /* ===== Variant A — “Paper”: typographic, book-like, quiet bottom rail ===== */
+  .vA{ background:#faf7f0; }
+  .vA .statusbar{ color:#444; }
+  .vA .h-masthead{
+    padding:22px 22px 10px; border-bottom:1px solid #d8d2c4;
+  }
+  .vA .brand{ font-size:13px; letter-spacing:.22em; text-transform:uppercase; color:#6b6559; }
+  .vA h1{ font-size:30px; font-weight:normal; margin-top:6px; color:#221f1a; }
+  .vA .sub{ font-size:13px; color:#7d7668; margin-top:4px; }
+  .vA section{ padding:16px 22px; border-bottom:1px solid #e4dfd2; }
+  .vA h2{
+    font-size:11px; letter-spacing:.18em; text-transform:uppercase;
+    color:#8a8272; font-weight:normal; margin-bottom:10px;
+  }
+  .vA .duecount{ font-size:44px; color:#221f1a; }
+  .vA .duecount small{ font-size:14px; color:#7d7668; letter-spacing:0; }
+  .vA .quietbtn{
+    display:block; text-align:center; text-decoration:none;
+    border:1px solid #221f1a; color:#221f1a; background:transparent;
+    padding:13px 0; font-size:15px; margin-top:14px; font-family:inherit;
+  }
+  .vA .row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding:9px 0; border-bottom:1px dotted #d3ccbc; font-size:15px;
+  }
+  .vA .row:last-child{ border-bottom:0; }
+  .vA .row .meta{ font-size:12px; color:#8a8272; }
+  .vA .rail{
+    position:sticky; bottom:0; display:flex; justify-content:space-around;
+    background:#faf7f0; border-top:1px solid #d8d2c4; padding:10px 0 14px;
+    font-family:Verdana,sans-serif; font-size:10px; color:#6b6559;
+  }
+  .vA .rail span{ display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .vA .rail .on{ color:#221f1a; }
+  .vA .glyph{ font-size:16px; font-family:Georgia,serif; }
+  .vA .textrow{ padding:13px 0; border-bottom:1px solid #e4dfd2; }
+  .vA .textrow .t{ font-size:17px; color:#221f1a; }
+  .vA .textrow .a{ font-size:12px; color:#8a8272; font-style:italic; margin-top:2px; }
+  .vA .textrow .p{ font-size:11px; color:#6b6559; margin-top:5px; font-family:Verdana,sans-serif; }
+  .vA .reader-body{ padding:26px 26px 40px; font-size:17.5px; line-height:1.85; color:#26231d; }
+  .vA .reader-body p{ margin-bottom:1.1em; text-align:justify; hyphens:auto; }
+  .vA .drop{ font-size:34px; line-height:.9; float:left; padding:4px 8px 0 0; color:#221f1a; }
+  .vA .reader-bar{
+    position:sticky; bottom:0; background:#faf7f0; border-top:1px solid #d8d2c4;
+    padding:10px 18px 14px; display:flex; justify-content:space-between; align-items:center;
+    font-family:Verdana,sans-serif; font-size:10px; color:#6b6559;
+  }
+  .vA .checkin{
+    background:#221f1a; color:#faf7f0; border:0; font-family:inherit;
+    padding:10px 16px; font-size:13px; cursor:pointer;
+  }
+  .vA .masteryline{ display:flex; gap:16px; margin:6px 0 10px; font-size:12px; color:#55503f; }
+  .vA .masteryline b{ font-size:16px; color:#221f1a; font-weight:normal; display:block; }
+  .vA .breath{
+    margin:60px auto 30px; width:120px; height:120px; border-radius:50%;
+    border:2px solid #8a8272; display:flex; align-items:center; justify-content:center;
+    animation:breatheA 4s ease-in-out infinite;
+  }
+  @keyframes breatheA{ 0%,100%{ transform:scale(.82);} 50%{ transform:scale(1);} }
+  .vA .pausewrap{ padding:0 26px; text-align:center; }
+  .vA .pausetitle{ font-size:26px; color:#221f1a; margin-bottom:6px; }
+  .vA .pausesub{ font-size:14px; color:#7d7668; line-height:1.6; }
+  .vA .pausestack{ margin-top:22px; display:flex; flex-direction:column; gap:10px; }
+  .vA .pausestack .quiet{ border:1px solid #b9b2a2; color:#55503f; }
+  .vA .pausestack .primary{ background:#221f1a; color:#faf7f0; }
+  .vA .hold{
+    position:absolute; top:40px; left:0; right:0; text-align:center;
+    font-family:Verdana,sans-serif; font-size:10px; color:#8a8272; letter-spacing:.1em;
+  }
+  .vA .dimmed-behind{ filter:blur(2px) grayscale(.6); opacity:.35; }
+  .vA .num{ font-variant-numeric:tabular-nums; }
+</style>
+
+<style>
+  /* ===== Variant B — “Ledger”: dense numbers, top segmented nav ===== */
+  .vB{ background:#12130f; color:#e8e4d8; }
+  .vB .statusbar{ color:#9a9689; }
+  .vB .segbar{
+    display:flex; border-bottom:1px solid #2c2e26; position:sticky; top:0;
+    background:#12130f; z-index:2;
+  }
+  .vB .segbar div{
+    flex:1; text-align:center; padding:14px 0 12px;
+    font-family:Verdana,sans-serif; font-size:11px; letter-spacing:.14em;
+    text-transform:uppercase; color:#77746a; border-bottom:2px solid transparent;
+  }
+  .vB .segbar .on{ color:#e8e4d8; border-color:#c8a24a; }
+  .vB .big{ padding:22px 20px 14px; border-bottom:1px solid #2c2e26; }
+  .vB .big-num{ font-size:56px; color:#e8e4d8; line-height:1; }
+  .vB .big-num span{ color:#c8a24a; }
+  .vB .big-label{
+    font-family:Verdana,sans-serif; font-size:10px; letter-spacing:.16em;
+    text-transform:uppercase; color:#77746a; margin-top:6px;
+  }
+  .vB .row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:11px 20px; border-bottom:1px solid #1f2119; font-size:14.5px;
+  }
+  .vB .row .r-meta{ font-family:'Courier New',monospace; font-size:11.5px; color:#77746a; }
+  .vB .row .r-tag{
+    font-family:Verdana,sans-serif; font-size:9.5px; letter-spacing:.12em;
+    text-transform:uppercase; padding:3px 7px; border:1px solid #3a3d31; color:#a29d8d;
+    margin-left:8px;
+  }
+  .vB .row .r-tag.gold{ border-color:#7d6327; color:#c8a24a; }
+  .vB .cta{
+    margin:18px 20px 0; display:block; text-align:center;
+    background:#c8a24a; color:#12130f; padding:14px 0; font-size:14px;
+    font-family:Verdana,sans-serif; letter-spacing:.1em; cursor:pointer;
+  }
+  .vB .grid2{ display:grid; grid-template-columns:1fr 1fr; border-bottom:1px solid #2c2e26; }
+  .vB .grid2 .cell{ padding:16px 20px; border-bottom:1px solid #1f2119; }
+  .vB .grid2 .cell:nth-child(odd){ border-right:1px solid #1f2119; }
+  .vB .cell .n{ font-size:30px; color:#e8e4d8; }
+  .vB .cell .l{ font-family:Verdana,sans-serif; font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:#77746a; margin-top:4px; }
+  .vB .reader-body{ padding:24px 22px 30px; font-size:17px; line-height:1.85; color:#ded9cb; }
+  .vB .reader-body p{ margin-bottom:1.05em; }
+  .vB .reader-bar{
+    position:sticky; bottom:0; background:#12130f; border-top:1px solid #2c2e26;
+    padding:12px 18px; display:flex; justify-content:space-between; align-items:center;
+  }
+  .vB .progress{ font-family:Verdana,sans-serif; font-size:10px; color:#77746a; letter-spacing:.08em;}
+  .vB .checkin{
+    background:#c8a24a; border:0; color:#12130f; padding:11px 18px;
+    font-family:Verdana,sans-serif; font-size:12px; letter-spacing:.08em; cursor:pointer;
+  }
+  .vB .breath{
+    margin:54px auto 26px; width:130px; height:130px; border-radius:50%;
+    border:1px solid #7d6327; box-shadow:inset 0 0 30px rgba(200,162,74,.25);
+    display:flex; align-items:center; justify-content:center;
+    animation:breatheA 4s ease-in-out infinite;
+  }
+  .vB .breath i{ color:#c8a24a; font-style:normal; font-family:Verdana,sans-serif; font-size:10px; letter-spacing:.2em; }
+  .vB .pausewrap{ padding:0 24px; text-align:center; }
+  .vB .pausestack{ margin-top:20px; display:flex; flex-direction:column; gap:8px; }
+  .vB .pausestack .primary{ background:#e8e4d8; color:#12130f; border:0; padding:13px 0; font-family:Verdana,sans-serif; font-size:12px; letter-spacing:.1em; cursor:pointer;}
+  .vB .pausestack .quiet{ background:transparent; border:1px solid #3a3d31; color:#a29d8f; padding:12px 0; font-family:Verdana,sans-serif; font-size:12px; cursor:pointer;}
+  .vB .hold{ font-family:Verdana,sans-serif; font-size:10px; color:#77746a; letter-spacing:.14em; margin-top:16px; }
+</style>
+
+<style>
+  /* ===== Variant C — “Momentum”: cards, bottom tabs, friendly app feel ===== */
+  .vC{ background:#f2f4f7; font-family:-apple-system,'Segoe UI',Roboto,Verdana,sans-serif; }
+  .vC .statusbar{ color:#555; }
+  .vC .h-head{ padding:20px 18px 6px; }
+  .vC .h-date{ font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#7a8291; font-family:Verdana,sans-serif;}
+  .vC h1{ font-size:24px; color:#1c2530; margin-top:4px; font-weight:600; }
+  .vC .card{
+    margin:12px 16px; background:#fff; border-radius:18px; padding:16px;
+    box-shadow:0 2px 10px rgba(20,30,50,.07);
+  }
+  .vC .card .card-label{ font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#8a94a6; }
+  .vC .card .n{ font-size:40px; color:#1c2536; margin-top:4px; }
+  .vC .card .n small{ font-size:14px; color:#8a94a6; }
+  .vC .pill{
+    display:inline-block; padding:11px 18px; border-radius:999px; font-size:14px;
+    background:#1c5eff; color:#fff; margin-top:10px; cursor:pointer;
+  }
+  .vC .pill.ghost{ background:#eef1f6; color:#1c2536; }
+  .vC .tabs{
+    position:sticky; bottom:0; display:flex; background:#fff; padding:8px 0 18px;
+    box-shadow:0 -4px 14px rgba(20,30,50,.08); border-radius:0 0 0 0;
+  }
+  .vC .tabs span{ flex:1; text-align:center; font-size:10.5px; color:#98a1b0; font-family:Verdana,sans-serif; }
+  .vC .tabs .on{ color:#1c5eff; font-weight:600; }
+  .vC .sessions{ display:flex; align-items:center; gap:12px; padding:6px 0; }
+  .vC .sessions .dot{ width:34px; height:34px; border-radius:50%; background:#eef1f6; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center; font-size:15px; }
+  .vC .sessions .t{ font-size:14.5px; color:#1c2536; font-weight:600; }
+  .vC .sessions .m{ font-size:11.5px; color:#8a94a6; margin-top:2px; font-family:Verdana,sans-serif; }
+  .vC .textrow{ display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #edf0f4; }
+  .vC .textrow:last-child{ border:0; }
+  .vC .textrow .t{ font-size:15.5px; color:#1c2536; font-weight:600; }
+  .vC .textrow .a{ font-size:12px; color:#8a94a6; margin-top:2px; font-family:Verdana,sans-serif; }
+  .vC .textrow .pct{ font-size:12px; color:#6b7686; font-family:Verdana,sans-serif; }
+  .vC .mini{ width:44px; height:44px; border-radius:50%; background:conic-gradient(#1c5eff 0 45%, #e8ebf1 0);
+    display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+  .vC .mini b{ width:36px; height:36px; background:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; color:#1c2536; }
+  .vC .reader-head{ padding:16px 18px 8px; }
+  .vC .reader-head .back{ font-family:Verdana,sans-serif; font-size:12px; color:#1c5eff; }
+  .vC .reader-head .tt{ font-size:19px; font-weight:600; color:#1c2536; margin-top:6px; }
+  .vC .reader-body{ padding:6px 20px 24px; font-size:16.5px; line-height:1.8; color:#2a3342; }
+  .vC .reader-body p{ margin-bottom:1em; }
+  .vC .reader-bar{
+    position:sticky; bottom:0; background:#fff; padding:10px 16px 16px;
+    box-shadow:0 -4px 14px rgba(20,30,50,.08); display:flex; align-items:center; justify-content:space-between;
+  }
+  .vC .reader-bar .progress{ font-size:11px; color:#8a94a6; font-family:Verdana,sans-serif; }
+  .vC .checkin{ background:#1c5eff; color:#fff; border:0; border-radius:999px; padding:12px 20px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .vC .breath{
+    margin:44px auto 24px; width:110px; height:110px; border-radius:50%;
+    background:radial-gradient(circle at 50% 40%, #dbe6ff, #eef1f6);
+    animation:breatheA 4s ease-in-out infinite;
+  }
+  .vC .pausewrap{ padding:0 22px; text-align:center; }
+  .vC .pausestack{ margin-top:18px; display:flex; flex-direction:column; gap:9px; }
+  .vC .pausestack .btn{ padding:14px 0; border-radius:999px; font-size:15px; font-weight:600; cursor:pointer;}
+  .vC .pausestack .btn-continue{ background:#1c5eff; color:#fff; }
+  .vC .pausestack .btn-replace{ background:#fff; color:#1c2536; box-shadow:0 2px 8px rgba(20,30,50,.1); }
+  .vC .appicon{ width:44px; height:44px; border-radius:10px; margin:0 auto 10px;
+    background:linear-gradient(135deg,#f66,#b33); display:flex; align-items:center; justify-content:center; color:#fff; font-size:19px;}
+  .vC .masteryrow{ display:flex; gap:10px; margin-top:10px; }
+  .vC .masteryrow .lv{ flex:1; border-radius:14px; padding:12px; text-align:center; }
+  .vC .masteryrow .lv b{ font-size:22px; display:block; }
+  .vC .masteryrow .lv span{ font-size:10.5px; color:#5a6474; font-family:Verdana,sans-serif; }
+  .vC .lv-fam{ background:#eef1f6; } .vC .lv-pro{ background:#fff2d8; } .vC .lv-mas{ background:#dff2e3; }
+  .vC .streakchip{
+    display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#8a6a1f;
+    background:#fff4d6; border-radius:999px; padding:6px 12px; font-family:Verdana,sans-serif;
+  }
+  .vC .handoff-ico{ font-size:30px; }
+</style>
+</head>
+
+<body>
+<div class="proto-tag">Eruditio · UI wireframe prototype · variant <span id="tagV"></span></div>
+
+<div class="phone"><div class="screen-area" id="stage">
+
+  <!-- ================= HOME ================= -->
+  <div class="screen" id="p-home"></div>
+
+  <!-- ================= LIBRARY ================= -->
+  <div class="screen" id="p-library"></div>
+
+  <!-- ================= READER ================= -->
+  <div class="screen" id="p-reader"></div>
+
+  <!-- ================= REVIEW ================= -->
+  <div class="screen" id="p-review"></div>
+
+  <!-- ================= PAUSE (overlay) ================= -->
+  <div class="screen" id="p-pause"></div>
+
+  <!-- ================= PROGRESS ================= -->
+  <div class="screen" id="p-progress"></div>
+
+  <!-- ================= HANDOFF ================= -->
+  <div class="screen" id="p-handoff"></div>
+
+</div></div>
+
+<!-- floating switcher -->
+<div class="switcher" id="bar">
+  <button id="prev" title="Previous variant">◀</button>
+  <span class="vname" id="vname"></span>
+  <button id="next" title="Next variant">▶</button>
+  <span class="pages" id="pagetabs"></span>
+</div>
+
+<script>
+/* ---------- shared mock data (read-only; no persistence) ---------- */
+const texts = [
+  { t:"Apology",            a:"Plato · Jowett",          p:0.41 },
+  { t:"Crito",              a:"Plato · Jowett",          p:0.88 },
+  { t:"Euthyphro",          a:"Plato · Jowett",          p:0 },
+  { t:"Meno",               a:"Plato · Jowett",          p:0.12 },
+  { t:"Phaedo",             a:"Plato · Jowett",          p:0 },
+  { t:"Republic",           a:"Plato · Jowett",          p:0.05 },
+  { t:"Phaedrus",           a:"Plato · Jowett",          p:0 },
+  { t:"Meditations",        a:"Marcus Aurelius · Long",  p:0.41 },
+  { t:"Enchiridion",        a:"Epictetus · Long",        p:0.63 },
+  { t:"Golden Sayings",     a:"Epictetus · Crossley",    p:0 },
+  { t:"The Odyssey",        a:"Homer · Butler",          p:0 },
+  { t:"The Aeneid",         a:"Virgil · Williams",       p:0 },
+  { t:"Consolation of Philosophy", a:"Boethius · James", p:0 },
+  { t:"Confessions",        a:"Augustine · Pusey",       p:0.22 },
+  { t:"The City of God",    a:"Augustine · Dods",        p:0 },
+  { t:"On Christian Doctrine", a:"Augustine",            p:0 },
+  { t:"The Pilgrim's Progress", a:"John Bunyan",         p:0.74 },
+  { t:"The Imitation of Christ", a:"Thomas à Kempis",    p:0 },
+  { t:"Practice of the Presence of God", a:"Brother Lawrence", p:0.91 },
+  { t:"Spurgeon's Sermons · Vol. 1", a:"C. H. Spurgeon", p:0.33 },
+  { t:"Spurgeon's Sermons · Vol. 2", a:"C. H. Spurgeon", p:0 },
+  { t:"Spurgeon's Sermons · Vol. 3", a:"C. H. Spurgeon", p:0 },
+  { t:"Psalms",             a:"KJV",                     p:0.52 },
+  { t:"Proverbs",           a:"KJV",                     p:0 },
+  { t:"Ecclesiastes",       a:"KJV",                     p:0 },
+  { t:"Gospel of John",     a:"KJV",                     p:0.35 },
+  { t:"Gospel of Matthew",  a:"KJV",                     p:0 },
+  { t:"A Retrospect",       a:"J. Hudson Taylor",        p:0.18 },
+  { t:"Journal of John Woolman", a:"John Woolman",       p:0 },
+  { t:"Fox's Book of Martyrs", a:"John Foxe",            p:0 },
+];
+const sessions = [
+  { t:"Republic · Book I",        m:"25 min ago · 12 min read", g:"📖" },
+  { t:"Meditations · Book II",    m:"yesterday · 9 min read",   g:"🕯️" },
+  { t:"Psalms 23–30",             m:"2 days ago · 6 min read",  g:"✝️" },
+];
+const due = [
+  { cue:"Republic — Book I · segment 3", ex:"…when he had fastened a ring on his finger, he was seized with a desire…", lv:"familiar" },
+  { cue:"Meditations — Book II · segment 1", ex:"Begin the morning by saying to thyself, I shall meet with the busy-body, the ungrateful…", lv:"proficient" },
+  { cue:"Confessions — Book I · segment 2", ex:"And what can be more pitiful than an unhappy wretch who pities not himself…", lv:"mastered" },
+];
+const para1 = "I went down yesterday to the Piraeus with Glaucon the son of Ariston, that I might offer up my prayers to the goddess; and also because I wanted to see in what manner they would celebrate the festival. The procession of the citizens was most magnificent, and the display of the foreigners no less so. When we had finished our prayers and seen the spectacle, we were going home.";
+const para2 = "To the house of Polemarchus we were led, and there we found his brothers Lysias and Euthydemus, and Thrasymachus the Chalcedonian, and others. The feast of Bendis was drawing to its close, and the company was preparing to go up to the house of Polemarchus. Adeimantus caught sight of us from a distance, and cried: Come hither, Socrates, and bid me welcome.";
+
+/* ---------- variant renderers ---------- */
+const rail = (on) => `
+  <div class="rail">
+    <span class="${on==='home'?'on':''}"><span class="glyph">⌂</span>Home</span>
+    <span class="${on==='library'?'on':''}"><span class="glyph">☰</span>Library</span>
+    <span class="${on==='review'?'on':''}"><span class="glyph">↺</span>Reviews</span>
+    <span class="${on==='progress'?'on':''}"><span class="glyph">◉</span>Progress</span>
+  </div>`;
+const tabs = (on) => `
+  <div class="segbar">
+    <div class="${on==='home'?'on':''}">Today</div>
+    <div class="${on==='library'?'on':''}">Library</div>
+    <div class="${on==='review'?'on':''}">Reviews</div>
+    <div class="${on==='progress'?'on':''}">Progress</div>
+  </div>`;
+const bottom = () => `
+  <div class="tabs">
+    <span class="on">⌂ Home</span><span>☰ Library</span><span>↺ Reviews</span><span>◉ Progress</span>
+  </div>`;
+
+/* ---- HOME ---- */
+function renderHome(v){
+  if(v==='A') return `
+    <div class="statusbar">9:41</div>
+    <div class="h-masthead"><div class="brand">Eruditio</div>
+      <h1>Today</h1><div class="sub">Four days running. No one else will see this.</div></div>
+    <section><h2>Reviews due today</h2>
+      <div class="duecount num">6 <small>cards</small></div>
+      <button class="quietbtn">Begin review</button></section>
+    <section><h2>Recent sessions</h2>
+      <div class="row"><span>Republic · Book I</span><span class="meta">25 min ago</span></div>
+      <div class="row"><span>Meditations · Book II</span><span class="meta">yesterday</span></div>
+      <div class="row"><span>Psalms 23–30</span><span class="meta">2 days ago</span></div></section>
+    <section><h2>Continue reading</h2>
+      <div class="row"><span>Meditations</span><span class="meta">41% · Book II</span></div></section>
+    ${rail('home')}`;
+  if(v==='B') return `
+    <div class="statusbar">9:41</div>
+    ${tabs('home')}
+    <div class="big"><div class="big-num">6<span>/</span>…</div><div class="big-label">review cards due today</div></div>
+    <div class="cta">BEGIN REVIEW →</div>
+    <div style="height:14px"></div>
+    <div class="row"><span>Republic · Book I</span><span class="r-meta">12 MIN · 25 MIN AGO</span></div>
+    <div class="row"><span>Meditations · Book II</span><span class="r-meta">9 MIN · YESTERDAY</span></div>
+    <div class="row"><span>Psalms 23–30</span><span class="r-meta">6 MIN · 2 DAYS AGO</span></div>
+    <div class="row"><span>Meditations</span><span class="r-meta">RESUME 41%</span></div>`;
+  if(v==='C') return `
+    <div class="statusbar">9:41</div>
+    <div class="h-head"><div class="h-date">Wednesday, Sep 24</div><h1>Good morning</h1>
+      <span class="streakchip">🔥 4-day streak</span></div>
+    <div class="card"><div class="card-label">Reviews due today</div>
+      <div class="n">6 <small>cards</small></div><span class="pill">Begin review</span></div>
+    <div class="card"><div class="card-label">Recent sessions</div>
+      <div class="sessions"><span class="dot">📖</span><div><div class="t">Republic · Book I</div><div class="m">25 min ago · 12 min read</div></div></div>
+      <div class="sessions"><span class="dot">🕯️</span><div><div class="t">Meditations · Book II</div><div class="m">yesterday · 9 min read</div></div></div></div>
+    <div class="card"><div class="card-label">Continue reading</div>
+      <div class="sessions"><span class="dot">🧉</span><div><div class="t">Meditations</div><div class="m">Book II · 41%</div></div></div>
+      <span class="pill ghost">Open reader</span></div>
+    ${bottom()}`;
+}
+
+/* ---- LIBRARY ---- */
+function renderLibrary(v){
+  const rowsA = texts.map(x=>`<div class="textrow"><div class="t">${x.t}</div><div class="a">${x.a}</div>
+      <div class="p num">${x.p? Math.round(x.p*100)+'% read' : 'unread'}</div></div>`).join('');
+  if(v==='A') return `
+    <div class="statusbar">9:41</div>
+    <div class="h-masthead"><div class="brand">Eruditio</div><h1>Library</h1>
+      <div class="sub num">30 texts · bundled · offline</div></div>
+    <div style="padding:0 22px 6px">${rowsA}</div>${rail('library')}`;
+  if(v==='B') return `
+    <div class="statusbar">9:41</div>${tabs('library')}
+    <div class="row"><span class="r-meta num">HISTORY</span></div>
+    ${texts.map(x=>`<div class="row"><span>${x.t}</span><span class="r-meta">${x.a.split('·')[0]}${x.p?` · ${Math.round(x.p*100)}%`:' · UNREAD'}</span></div>`).join('')}`;
+  if(v==='C') return `
+    <div class="statusbar">9:41</div>
+    <div class="h-head"><h1>Your library</h1>
+      <div class="h-date">30 classics · works offline</div></div>
+    <div class="card">${texts.slice(0,7).map(x=>`
+      <div class="textrow"><div><div class="t">${x.t}</div><div class="a">${x.a}</div></div>
+      ${x.p?`<span class="mini"><b>${Math.round(x.p*100)}%</b></span>`:'<span class="pct">New</span>'}</div>`).join('')}
+    </div>
+    <div class="card"><div class="card-label">More texts</div>
+      <div class="m num" style="font-size:13px;color:#8a94a6">…and 23 more, all bundled in the app</div></div>
+    ${bottom()}`;
+}
+
+/* ---- READER ---- */
+function renderReader(v){
+  if(v==='A') return `
+    <div class="statusbar">9:41</div>
+    <div style="padding:14px 22px 0" class="sub num">Meditations — Marcus Aurelius · Book II · 41%</div>
+    <div class="reader-body">
+      <p><span class="drop">B</span>egin the morning by saying to thyself, I shall meet with the
+      busy-body, the ungrateful, the insolent, the deceitful, the envious, the unsocial. All
+      these things happen to them by reason of their ignorance of what is good and evil.</p>
+      <p>But I who have seen the nature of the good that it is beautiful, and of the bad that it
+      is ugly, and the nature of him who does wrong, that it is akin to myself…</p>
+      <p>I can neither be injured by any of them, for no one can involve me in what is
+      disgraceful, nor can I be angry with my kinsman nor hate him.</p>
+      <p>For we have been born for co-operation, like feet, like hands, like eyelids, like the
+      rows of the upper and lower teeth. To act against one another then is contrary to nature.</p>
+    </div>
+    <div class="reader-bar"><span>position remembered automatically</span>
+      <button class="checkin">Check in — I read to here</button></div>`;
+  if(v==='B') return `
+    <div class="statusbar">9:41</div>${tabs('')}
+    <div class="row"><span>Meditations · Marcus Aurelius</span><span class="r-meta">SEG 12/88 · 41%</span></div>
+    <div class="reader-body">
+      <p>Begin the morning by saying to thyself, I shall meet with the busy-body, the ungrateful,
+      the insolent, the deceitful, the envious, the unsocial.</p>
+      <p>All these things happen to them by reason of their ignorance of what is good and evil.
+      I who have seen the nature of the good — that it is beautiful; the bad — that it is ugly;
+      and the nature of him who does wrong — that it is akin to me, not only of the same blood
+      or seed, but that it participates in the same intelligence and the same portion of divinity…</p>
+      <p>I can neither be injured by any of them — for no one can involve me in disgrace —
+      nor can I be angry with my kinsman, nor hate him.</p>
+    </div>
+    <div class="reader-bar"><span class="progress">READING · NO FEEDS · NO ADS</span>
+      <button class="checkin">CHECK IN ✓</button></div>`;
+  if(v==='C') return `
+    <div class="statusbar">9:41</div>
+    <div class="reader-head"><span class="back">← Library</span><div class="tt">Meditations</div>
+      <div class="h-date">Marcus Aurelius · Book II · 41%</div></div>
+    <div class="reader-body">
+      <p>Begin the morning by saying to thyself: I shall meet with the busy-body, the ungrateful,
+      the insolent, the deceitful, the envious, the unsocial.</p>
+      <p>All these things happen to them by reason of their ignorance of what is good and evil.
+      I, who have seen the nature of the good — that it is beautiful — and the nature of the
+      bad — that it is ugly…</p>
+      <p>…and I who have seen the nature of the wrongdoer himself, that he is akin to me —
+      not of the same blood, but sharing the same mind and a portion of divinity — I cannot
+      be injured by any of them.</p>
+    </div>
+    <div class="reader-bar"><span class="progress">Book II · 41% · saved</span>
+      <button class="checkin">✓ Check in</button></div>`;
+}
+
+/* ---- REVIEW ---- */
+function renderReview(v){
+  if(v==='A') return `
+    <div class="statusbar">9:41</div>
+    <div class="h-masthead"><div class="brand">Eruditio</div>
+      <h1 style="font-size:26px">Review — 6 due</h1>
+      <div class="sub">Card 1 of 6 · Republic, Book I</div></div>
+    <div class="reader-body"><p><span class="drop">W</span>hat happened to the man with the
+      ring, and what did he do with it?</p>
+      <p class="sub" style="margin-top:12px">Recall it before revealing your grade —
+      the point is remembering, not re-reading.</p></div>
+    <div class="reader-bar" style="justify-content:space-between">
+      <span>Again</span><span>Hard</span><span style="color:#221f1a">Good</span><span>Easy</span></div>`;
+  if(v==='B') return `
+    <div class="statusbar">9:41</div>${tabs('review')}
+    <div class="row"><span class="r-meta">CARD 1/6</span><span class="r-meta">REPUBLIC · BK I · SEG 3</span></div>
+    <div class="reader-body"><p>What happened to the man with the ring, and what did he do with it?</p></div>
+    <div class="grid2" style="border-top:1px solid #2c2e26">
+      <div class="cell"><div class="n">0</div><div class="l">Again</div></div>
+      <div class="cell"><div class="n">1</div><div class="l">Hard</div></div>
+      <div class="cell"><div class="n">2</div><div class="l">Good</div></div>
+      <div class="cell"><div class="n">3</div><div class="l">Easy</div></div></div>`;
+  if(v==='C') return `
+    <div class="statusbar">9:41</div>
+    <div class="h-head"><h1>Review</h1><div class="h-date">1 of 6 · Republic, Book I</div></div>
+    <div class="card"><div class="card-label">Recall</div>
+      <div class="m" style="font-size:17px;line-height:1.7;color:#2a3342;margin-top:8px">
+        What happened to the man with the ring, and what did he do with it?</div></div>
+    <div class="card"><div class="card-label">Grade your recall</div>
+      <div class="masteryrow">
+        <span class="lv lv-fam" style="cursor:pointer"><b>😤</b><span>Again</span></span>
+        <span class="lv lv-pro" style="cursor:pointer"><b>🙂</b><span>Hard</span></span>
+        <span class="lv lv-mas" style="cursor:pointer"><b>🙂</b><span>Good</span></span>
+        <span class="lv lv-fam" style="cursor:pointer"><b>😎</b><span>Easy</span></span>
+      </div></div>
+    ${bottom()}`;
+}
+
+/* ---- PAUSE (interception overlay) ---- */
+function renderPause(v){
+  const behind = `<div class="dimmed-behind" style="position:absolute;inset:0;background:#ded7c8">
+      <div style="padding:40px 18px;font-family:Verdana,sans-serif;font-size:12px;color:#666">
+        (your scroll app, dimmed underneath)</div></div>`;
+  if(v==='A') return `
+    <div style="position:relative;height:100%">
+      ${behind}
+      <div style="position:absolute;inset:0;background:rgba(250,247,240,.94)">
+        <div class="statusbar">9:41</div>
+        <div class="hold num">PAUSE · 8 OF 10 SECONDS</div>
+        <div class="breath"><span class="num" style="font-size:12px;letter-spacing:.2em;color:#8a8272">BREATHE</span></div>
+        <div class="pausewrap">
+          <div class="pausetitle">Opening <span class="num">Instagram</span></div>
+          <div class="pausesub">No hurry. Stay here, or go on — your call.</div>
+          <div class="pausestack">
+            <button class="quietbtn primary">Continue to Instagram</button>
+            <button class="quietbtn quiet">Read a page instead · 6 min</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  if(v==='B') return `
+    <div style="position:relative;height:100%">
+      ${behind}
+      <div style="position:absolute;inset:0;background:rgba(18,19,15,.96)">
+        <div class="statusbar">9:41</div>
+        <div class="breath"><i>08</i></div>
+        <div class="pausewrap">
+          <div class="big-num" style="font-size:30px">Instagram</div>
+          <div class="big-label">this opening was automatic?</div>
+          <div class="pausestack">
+            <div class="pausestack">
+              <button class="primary">CONTINUE TO APP →</button>
+              <button class="ghost">READ INSTEAD · REPLACE</button>
+            </div>
+          </div>
+          <div class="hold">YOUR CALL · NO HARD BLOCK, EVER</div>
+        </div>
+      </div>
+    </div>`;
+  if(v==='C') return `
+    <div style="position:relative;height:100%">
+      ${behind}
+      <div style="position:absolute;inset:0;background:rgba(242,244,247,.96)">
+        <div class="statusbar">9:41</div>
+        <div class="appicon">◉</div>
+        <div class="breath"></div>
+        <div class="pausewrap">
+          <h1 style="font-size:22px;text-align:center;color:#1c2536">Opening Instagram</h1>
+          <div class="h-date" style="text-align:center;margin-top:6px">8s pause · breathe · then choose</div>
+          <div class="pausestack">
+            <span class="btn btn-continue">Continue to Instagram</span>
+            <span class="btn btn-replace">Read a page instead</span>
+          </div>
+          <div class="h-date" style="text-align:center;margin-top:14px">never a hard block — the app is always one tap away</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ---- PROGRESS ---- */
+function renderProgress(v){
+  if(v==='A') return `
+    <div class="statusbar">9:41</div>
+    <div class="h-masthead"><div class="brand">Eruditio</div><h1>Progress</h1></div>
+    <section><h2>What you've read</h2>
+      <div class="duecount num">4 <small>texts in progress</small></div>
+      <div class="row"><span>Meditations</span><span class="meta">41%</span></div>
+      <div class="row"><span>Republic</span><span class="meta">5%</span></div>
+      <div class="row"><span>Psalms</span><span class="meta">52%</span></div>
+      <div class="row"><span>Enchiridion</span><span class="meta">63%</span></div></section>
+    <section><h2>Concepts by mastery</h2>
+      <div class="masteryline"><span><b class="num">14</b>familiar</span>
+        <span><b class="num">9</b>proficient</span><span><b class="num">5</b>mastered</span></div></section>
+    <section><h2>Reviews due</h2><div class="duecount num">6</div></section>
+    <section><h2>This week</h2>
+      <div class="row"><span>Openings intercepted</span><span class="meta num">17</span></div>
+      <div class="row"><span>→ chose to read instead</span><span class="meta num">6</span></div></section>
+    <section style="border-bottom:0"><h2>Streak</h2>
+      <div class="row"><span class="num">🔥 4 days</span><span class="meta">habit only — mastery is above</span></div></section>
+    ${rail('progress')}`;
+  if(v==='B') return `
+    <div class="statusbar">9:41</div>${tabs('progress')}
+    <div class="grid2">
+      <div class="cell"><div class="n">4</div><div class="l">texts in progress</div></div>
+      <div class="cell"><div class="n">6</div><div class="l">reviews due</div></div>
+      <div class="cell"><div class="n">14</div><div class="l">familiar</div></div>
+      <div class="cell"><div class="n">9</div><div class="l">proficient</div></div>
+      <div class="cell"><div class="n">5</div><div class="l">mastered</div></div>
+      <div class="cell"><div class="n">17</div><div class="l">opens intercepted · wk</div></div>
+    </div>
+    <div class="row"><span>Streak</span><span class="r-meta">4 DAYS · HABIT LAYER</span></div>`;
+  if(v==='C') return `
+    <div class="statusbar">9:41</div>
+    <div class="h-head"><h1>Progress</h1><div class="h-date">September, week 4</div></div>
+    <div class="card"><div class="card-label">Concepts by mastery</div>
+      <div class="masteryrow">
+        <span class="lv lv-fam"><b>14</b><span>familiar</span></span>
+        <span class="lv lv-pro"><b>9</b><span>proficient</span></span>
+        <span class="lv lv-mas"><b>5</b><span>mastered</span></span></div></div>
+    <div class="card"><div class="card-label">Reading</div>
+      <div class="m" style="font-size:15px;color:#2a3342;line-height:1.8">
+        4 texts in progress · 6 reviews due<br>Meditations 41% · Psalms 52% · Enchiridion 63% · Republic 5%</div></div>
+    <div class="card"><div class="card-label">Intercepted this week</div>
+      <div class="n">17 <small>openings</small></div>
+      <div class="m" style="margin-top:4px">6 of them became reading sessions</div></div>
+    <div class="card" style="background:#fffbea"><span class="streakchip">🔥 4-day streak</span>
+      <div class="m" style="font-size:11px;color:#a08b4e;margin-top:6px">habit layer — shown small on purpose; mastery above is the real thing</div></div>
+    ${bottom()}`;
+}
+
+/* ---- HANDOFF (post-session) ---- */
+function renderHandoff(v){
+  if(v==='A') return `
+    <div class="statusbar">9:41</div>
+    <div class="h-masthead"><div class="brand">Eruditio</div><h1 style="font-size:24px">Session complete</h1>
+      <div class="sub">Republic · Book I · 12 min · +2 concepts</div></div>
+    <section><h2>Where next</h2>
+      <div class="row"><span>World History: Beginnings</span><span class="meta">Khan Academy ↗</span></div>
+      <div class="sub" style="margin-top:8px">One suggested next step — the link only appears right after a session.</div></section>
+    <div class="reader-bar"><span></span><button class="checkin">Back home</button></div>`;
+  if(v==='B') return `
+    <div class="statusbar">9:41</div>${tabs('')}
+    <div class="row"><span>SESSION CLOSED</span><span class="r-meta">12 MIN · +2 CONCEPTS</span></div>
+    <div class="reader-body"><p>Republic · Book I complete.</p></div>
+    <div class="row"><span>WORLD HISTORY: BEGINNINGS</span><span class="r-tag gold">KHAN ACADEMY ↗</span></div>
+    <div class="row"><span class="r-meta">SUGGESTED NEXT STEP · SHOWN ONLY HERE</span></div>`;
+  if(v==='C') return `
+    <div class="statusbar">9:41</div>
+    <div class="h-head"><h1>Session complete 🎉</h1><div class="h-date">Republic · 12 min · +2 concepts</div></div>
+    <div class="card" style="text-align:center">
+      <div class="handoff-ico">🤝</div>
+      <div class="card-label">One next step</div>
+      <div class="t" style="font-size:17px;font-weight:600;color:#1c2536;margin:6px 0">World History: Beginnings</div>
+      <span class="pill">Open Khan Academy ↗</span>
+      <div class="m" style="font-size:11px;color:#8a94a6;margin-top:10px">this link exists only here, right after a session</div>
+    </div>
+    ${bottom()}`;
+}
+
+/* ---------- mounting ---------- */
+const PAGES = {
+  home:    { name:'Home',      render: renderHome    },
+  library: { name:'Library',   render: renderLibrary },
+  reader:  { name:'Reader',    render: renderReader  },
+  review:  { name:'Review',    render: renderReview  },
+  pause:   { name:'Pause screen', render: renderPause },
+  progress:{ name:'Progress',  render: renderProgress},
+  handoff: { name:'Handoff',   render: renderHandoff },
+};
+const VARIANTS = { A:'Paper (book feel)', B:'Ledger (numbers-first)', C:'Momentum (cards + tabs)' };
+
+let page='home', variant='A';
+function apply(){
+  document.querySelectorAll('.screen').forEach(s=>{ s.classList.remove('active'); s.className='screen'; });
+  const el=document.getElementById('p-'+page);
+  el.classList.add('v'+variant,'active');
+  el.innerHTML=PAGES[page].render(variant);
+  document.getElementById('vname').textContent = `${variant} — ${VARIANTS[variant]} · ${PAGES[page].name}`;
+  document.getElementById('tagV').textContent = variant;
+  const bar=document.getElementById('pagetabs'); bar.innerHTML='';
+  for(const [k,p] of Object.entries(PAGES)){
+    const b=document.createElement('button'); b.textContent=p.name;
+    b.onclick=()=>setPage(k); if(k===page)b.className='on'; bar.appendChild(b);
+  }
+  const u=new URL(location.href);
+  u.searchParams.set('variant',variant); u.searchParams.set('page',page);
+  history.replaceState(null,'',u);
+}
+function setVariant(v){ variant=v; apply(); }
+function setPage(p){ page=p; apply(); }
+document.getElementById('prev').onclick=()=>cycle(-1);
+document.getElementById('next').onclick=()=>cycle(1);
+function cycle(d){
+  const keys=Object.keys(VARIANTS);
+  variant=keys[(keys.indexOf(variant)+d+keys.length)%keys.length]; apply();
+}
+document.addEventListener('keydown',e=>{
+  const t=document.activeElement;
+  if(t && (t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable)) return;
+  if(e.key==='ArrowLeft') cycle(-1);
+  if(e.key==='ArrowRight') cycle(1);
+});
+const sp=new URLSearchParams(location.search);
+if(VARIANTS[sp.get('variant')]) variant=sp.get('variant');
+if(PAGES[sp.get('page')]) page=sp.get('page');
+apply();
+</script>
+</body>
+</html>
