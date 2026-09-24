@@ -4,9 +4,13 @@
 
 **Blocked by:** 12 (Resume anchor = top-of-screen line).
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [ ] Checkpoint dots appear in the gutter at the widened spacing (every 12 items; spacing decision recorded here, revisit only with evidence)
 - [ ] Pause chip completes the session at that checkpoint and returns to Home
 - [ ] Resume after pause lands on the saved top line
 - [ ] Rail (if shipped) shows checkpoint ticks
+
+## Comments
+
+**2026-09-24 — agent**: Shipped on `t14-checkpoints` (commit ef0dc3f), merged to `eruditio-mvp-2` (7854365). Dots: every row gained a constant 18dp start gutter; `index % 12 == 11` rows draw a 9dp dot — spacing decision recorded: **12 items** (≙ ~2 screens at bodyLarge/30sp line height; revisit only with evidence). "Pause here" chip (quiet TextButton) appears whenever a checkpoint is visible; pause = save checkpoint item as resume point → `completeSession(sessionId, endCharAtNextCheckpoint)` → `finish()`, no completion screen. Race hardening: pending debounced saver cancelled and onPause flush callback nulled before finish, so nothing overwrites the checkpoint save. Pause-to-Home: `pauseToHome` flag on AppContainer consumed by the shell (reader is a separate activity; no activity-result contract exists — container-level flag was the minimal seam). Rail ticks deferred to ticket 15 (rail ships there). Seam tests green. Human step: device smoke (dots, chip, pause → Home, resume lands on checkpoint).
