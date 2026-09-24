@@ -58,6 +58,12 @@ fun App(vm: EruditioViewModel) {
     EruditioTheme(palette) {
         var tab by rememberSaveable { mutableStateOf(0) }
         LaunchedEffect(Unit) { vm.refresh() }
+        // Checkpoint pause (ticket 14): the reader sets this while this activity
+        // was stopped; returning recomposes here and lands on Home/Today
+        // instead of the tab the user left.
+        if (vm.pauseToHome) {
+            LaunchedEffect(Unit) { tab = 0; vm.consumePauseToHome() }
+        }
         val homeState by vm.home.collectAsState()
         val reviewState by vm.review.collectAsState()
         val progressState by vm.progress.collectAsState()

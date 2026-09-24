@@ -4,15 +4,20 @@ import android.app.Activity
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -22,12 +27,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -121,6 +128,13 @@ private data class ReaderItem(
 )
 
 private const val MAX_ITEM_CHARS = 2000
+
+/**
+ * Checkpoint spacing (ticket 14, variant A widened): items with
+ * index % 12 == 11 are checkpoints — a gutter dot, and a quiet "Pause here"
+ * chip while one is on screen. Defined on reader ITEM indexes.
+ */
+private const val CHECKPOINT_SPACING = 12
 
 /**
  * Split with cumulative character offsets for exact restore. Blocks split on
@@ -221,14 +235,52 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
         onDispose { activity?.flushPosition = null }
     }
 
+    // Held so the checkpoint pause can stop a pending debounced save from
+    // overwriting the checkpoint position after it lands.
+    var saver: kotlinx.coroutines.Job? = null
     LaunchedEffect(listState, loaded) {
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .debounce(600)
-            .distinctUntilChanged()
-            .collect { idx ->
-                val start = starts.getOrNull(idx) ?: return@collect
-                container.positions.save(loaded.textId, start, idx)
-            }
+        saver = launch {
+            snapshotFlow { listState.firstVisibleItemIndex }
+                .debounce(600)
+                .distinctUntilChanged()
+                .collect { idx ->
+                    val start = starts.getOrNull(idx) ?: return@collect
+                    container.positions.save(loaded.textId, start, idx)
+                }
+        }
+    }
+
+    // A checkpoint is "on screen" while any currently visible item carries the
+    // checkpoint spacing; the chip shows for the nearest (topmost) one only.
+    val visibleCheckpoint by remember(listState) {
+        derivedStateOf {
+            listState.layoutInfo.visibleItemsInfo
+                .asSequence()
+                .map { it.index }
+                .filter { it % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1 }
+                .minOrNull()
+        }
+    }
+
+    // Pause at a checkpoint: the session completes AT that checkpoint (the next
+    // one bounds the segment), the resume point is the checkpoint line itself,
+    // and the activity finishes without the completion screen — the user lands
+    // back on the main app, which Home/Today consumes (see App.kt).
+    fun pauseAtCheckpoint(checkpoint: Int) {
+        saver?.cancel()
+        val next = ((checkpoint + 1)..items.lastIndex)
+            .firstOrNull { it % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1 }
+        val end = next?.let { starts[it] } ?: loaded.textLength
+        scope.launch {
+            container.positions.save(loaded.textId, starts[checkpoint], checkpoint)
+            container.sessions.completeSession(loaded.sessionId, end)
+            // Land on Home/Today when the shell returns (consumed in App.kt).
+            container.pauseToHome.value = true
+            // onPause would otherwise flush the current top line over the
+            // checkpoint save; the checkpoint IS the user's place now.
+            activity?.flushPosition = null
+            activity?.finish()
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -245,12 +297,37 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
         ) {
             items(items.size) { i ->
                 val item = items[i]
-                Text(
-                    item.text,
-                    Modifier.fillMaxWidth().padding(top = if (i > 0 && item.startsParagraph) 14.dp else 0.dp),
-                    style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 30.sp),
-                )
+                Row(
+                    Modifier.fillMaxWidth()
+                        .padding(top = if (i > 0 && item.startsParagraph) 14.dp else 0.dp),
+                ) {
+                    // Constant 18dp start gutter; checkpoint rows carry a 9dp
+                    // dot, every row indents alike so the text edge stays put.
+                    Box(Modifier.width(18.dp)) {
+                        if (i % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1) {
+                            Box(
+                                Modifier.align(Alignment.TopCenter)
+                                    .padding(top = 16.dp)
+                                    .size(9.dp)
+                                    .background(MaterialTheme.colorScheme.outline, CircleShape),
+                            )
+                        }
+                    }
+                    Text(
+                        item.text,
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 30.sp),
+                    )
+                }
             }
+        }
+        // Quiet, sticky, not a nag: the chip exists only while a checkpoint is
+        // actually on screen, then disappears with it.
+        visibleCheckpoint?.let { checkpoint ->
+            TextButton(
+                onClick = { pauseAtCheckpoint(checkpoint) },
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            ) { Text("Pause here", style = MaterialTheme.typography.labelLarge) }
         }
         Button(
             onClick = {
