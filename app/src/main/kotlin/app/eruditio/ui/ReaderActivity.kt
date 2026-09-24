@@ -4,6 +4,8 @@ import android.app.Activity
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -14,12 +16,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -42,11 +47,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import app.eruditio.AppContainer
 import app.eruditio.EruditioApp
+import app.eruditio.R
 import app.eruditio.core.CompletedSession
 import app.eruditio.ui.theme.EruditioTheme
 import kotlinx.coroutines.FlowPreview
@@ -143,6 +156,21 @@ private const val MAX_ITEM_CHARS = 2000
 private const val CHECKPOINT_SPACING = 12
 
 /**
+ * Plate frontispiece (ticket 21): ancient-track texts (TextMeta.group ==
+ * "ancient") prepend ONE plate item before all text items, like a book
+ * frontispiece. Every persisted position — resume saves, checkpoints, rail
+ * ticks — stays in TEXT-item space, so checkpoint math and the anchor
+ * contract are untouched; the offset is applied only at the scroll
+ * boundaries (firstVisibleItemIndex reads, scrollToItem restores), and the
+ * first visible item IS still the place — including when it is the plate.
+ */
+private const val PLATE_ITEM_COUNT = 1
+
+/** Header offset for this text: 1 plate item for the ancient track, else 0. */
+private val Loaded.plateOffset: Int
+    get() = if (group == "ancient") PLATE_ITEM_COUNT else 0
+
+/**
  * Split with cumulative character offsets for exact restore. Blocks split on
  * blank lines keep their offsets; a block larger than a couple of screens
  * (verse runs with no blank lines) is cut into per-line items so progress and
@@ -220,20 +248,23 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
     val listState = rememberLazyListState()
     val items = loaded.items
     val starts = remember(items) { items.map { it.startChar } }
+    val plateOffset = loaded.plateOffset
     val scope = rememberCoroutineScope()
     val activity = LocalContext.current as? ReaderActivity
 
     // The top visible line is the user's place: the debounced saver persists it
     // while scrolling, and activity pause flushes it immediately without waiting
     // for the debounce. Resume = scroll so this item is the FIRST visible item.
+    // The list index is a text-item index + the plate offset; persisted saves
+    // stay in TEXT-item space (the plate itself counts as "the beginning").
     fun saveTopLine() {
-        val idx = listState.firstVisibleItemIndex
+        val idx = (listState.firstVisibleItemIndex - plateOffset).coerceAtLeast(0)
         val start = starts.getOrNull(idx) ?: return
         scope.launch { container.positions.save(loaded.textId, start, idx) }
     }
 
     LaunchedEffect(loaded) {
-        if (loaded.startItem > 0) listState.scrollToItem(loaded.startItem)
+        if (loaded.startItem > 0) listState.scrollToItem(loaded.startItem + plateOffset)
     }
 
     DisposableEffect(activity, loaded) {
@@ -249,7 +280,8 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
             snapshotFlow { listState.firstVisibleItemIndex }
                 .debounce(600)
                 .distinctUntilChanged()
-                .collect { idx ->
+                .collect { listIdx ->
+                    val idx = (listIdx - plateOffset).coerceAtLeast(0)
                     val start = starts.getOrNull(idx) ?: return@collect
                     container.positions.save(loaded.textId, start, idx)
                 }
@@ -258,11 +290,12 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
 
     // A checkpoint is "on screen" while any currently visible item carries the
     // checkpoint spacing; the chip shows for the nearest (topmost) one only.
-    val visibleCheckpoint by remember(listState) {
+    // Visible list indexes are translated back to TEXT-item space first.
+    val visibleCheckpoint by remember(listState, plateOffset) {
         derivedStateOf {
             listState.layoutInfo.visibleItemsInfo
                 .asSequence()
-                .map { it.index }
+                .map { it.index - plateOffset }
                 .filter { it % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1 }
                 .minOrNull()
         }
@@ -295,6 +328,9 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
         items.indices.filter { it % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1 }.toIntArray()
     }
 
+    // Full-screen plate viewer (map + timeline) over the ancient track.
+    var plateViewer by remember { mutableStateOf(false) }
+
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 24.dp)) {
             Text(loaded.title, style = MaterialTheme.typography.titleLarge)
@@ -308,16 +344,28 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(24.dp),
             ) {
-            items(items.size) { i ->
-                val item = items[i]
+            items(items.size + plateOffset) { i ->
+                if (i < plateOffset) {
+                    // Ticket 21: the ancient-track frontispiece — a sourced
+                    // map plate as the first list item, tap to open the
+                    // full-screen plate viewer. Not part of the text: no
+                    // gutter, no checkpoint math.
+                    PlateFrontispiece(
+                        onOpen = { plateViewer = true },
+                        modifier = Modifier.fillParentMaxWidth().fillParentMaxHeight(0.9f),
+                    )
+                } else {
+                val item = items[i - plateOffset]
                 Row(
                     Modifier.fillMaxWidth()
-                        .padding(top = if (i > 0 && item.startsParagraph) 14.dp else 0.dp),
+                        .padding(top = if (i - plateOffset > 0 && item.startsParagraph) 14.dp else 0.dp),
                 ) {
                     // Constant 18dp start gutter; checkpoint rows carry a 9dp
                     // dot, every row indents alike so the text edge stays put.
+                    // Checkpoints count TEXT items: the plate shifts the list
+                    // index but never the checkpoint rhythm.
                     Box(Modifier.width(18.dp)) {
-                        if (i % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1) {
+                        if ((i - plateOffset) % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1) {
                             Box(
                                 Modifier.align(Alignment.TopCenter)
                                     .padding(top = 16.dp)
@@ -332,11 +380,15 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
                         style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 30.sp),
                     )
                 }
+                }
             }
             }
+            // Ticket 21: rail fractions must agree with resume — the rail
+            // tracks raw list indexes, so it counts the plate too, while the
+            // checkpoint tick indexes shift into list space by the offset.
             Rail(
-                checkpoints = checkpointIndexes,
-                itemCount = items.size,
+                checkpoints = checkpointIndexes.map { it + plateOffset }.toIntArray(),
+                itemCount = items.size + plateOffset,
                 listState = listState,
                 enabled = railEnabled,
                 scope = scope,
@@ -356,8 +408,9 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
                 // "I read to here" = the bottom of what is actually on screen
                 // (counted into the session), but the RESUME point is the top
                 // visible line itself, so a reopen lands on the exact line the
-                // user was reading at — never past it.
-                val firstVisible = listState.firstVisibleItemIndex
+                // user was reading at — never past it. List index -> text-item
+                // index via the plate offset; saves stay in TEXT-item space.
+                val firstVisible = (listState.firstVisibleItemIndex - plateOffset).coerceAtLeast(0)
                 val end = starts.getOrNull(firstVisible + 1) ?: loaded.textLength
                 scope.launch {
                     val done = container.sessions.completeSession(loaded.sessionId, end)
@@ -377,6 +430,190 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
             },
             modifier = Modifier.fillMaxWidth().padding(20.dp),
         ) { Text("Check in — I read to here") }
+    }
+
+    if (plateViewer) {
+        PlateViewer(onDismiss = { plateViewer = false })
+    }
+}
+
+/**
+ * Ticket 21: the ancient-track frontispiece — the sourced public-domain map
+ * (Shepherd 1926, Greece at the beginning of the Peloponnesian War, 431 BC)
+ * shown at roughly screen height with a quiet caption, like a book plate.
+ */
+@Composable
+private fun PlateFrontispiece(onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier.pointerInput(onOpen) { detectTapGestures { onOpen() } }) {
+        Image(
+            painter = painterResource(R.drawable.plate_greece_431bc),
+            contentDescription = "Map of Greece at the beginning of the Peloponnesian War, 431 BC",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        )
+        Text(
+            "Plate I · Greece at the beginning of the Peloponnesian War, 431 BC — tap to open",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+        )
+    }
+}
+
+/**
+ * Full-screen plate viewer: the sourced map and the typeset timeline, paged
+ * horizontally with dot navigation, dismissed by tapping out (or back).
+ * Quiet and offline: the image is bundled, nothing loads at view time.
+ */
+@Composable
+private fun PlateViewer(onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        val pagerState = rememberPagerState(pageCount = { 2 })
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .pointerInput(Unit) { detectTapGestures { onDismiss() } },
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+            ) { page ->
+                when (page) {
+                    0 -> Column(
+                        Modifier.fillMaxSize().padding(24.dp),
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.plate_greece_431bc),
+                            contentDescription = "Map of Greece at the beginning of the Peloponnesian War, 431 BC",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        )
+                        PlateCaption("Plate I · Greece at the beginning of the Peloponnesian War, 431 BC")
+                    }
+                    else -> Column(
+                        Modifier.fillMaxSize().padding(24.dp),
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        TimelinePlate(
+                            Modifier.weight(1f).fillMaxWidth(),
+                        )
+                        PlateCaption("Plate II · The span of the library, 428/427 BC – 1892")
+                    }
+                }
+            }
+            Column(
+                Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    "${pagerState.currentPage + 1} / 2",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(Modifier.padding(top = 8.dp)) {
+                    repeat(2) { dot ->
+                        Box(
+                            Modifier
+                                .padding(horizontal = 5.dp)
+                                .size(7.dp)
+                                .background(
+                                    if (dot == pagerState.currentPage) {
+                                        MaterialTheme.colorScheme.tertiary
+                                    } else {
+                                        MaterialTheme.colorScheme.outlineVariant
+                                    },
+                                    CircleShape,
+                                ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlateCaption(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.tertiary,
+        modifier = Modifier.padding(top = 12.dp),
+    )
+}
+
+/**
+ * Verified span of the bundled library: every date checked against
+ * authoritative sources (recorded on ticket 21). Single events tick once;
+ * lifespans draw a range between birth and death ticks.
+ */
+private data class PlateEvent(val label: String, val fromYear: Int, val toYear: Int, val row: Int)
+
+private val PLATE_TIMELINE_EVENTS = listOf(
+    PlateEvent("Plato b.", -427, -427, 0), // 428/427 BC (Britannica)
+    PlateEvent("Socrates d.", -399, -399, 1), // d. 399 BC (Britannica)
+    PlateEvent("Marcus Aurelius", 121, 180, 0),
+    PlateEvent("Augustine", 354, 430, 1),
+    PlateEvent("KJV", 1611, 1611, 0),
+    PlateEvent("Spurgeon", 1834, 1892, 1),
+)
+
+/** Axis spans the first dated event of the plates (431 BC map) to the last (1892). */
+private const val TIMELINE_MIN_YEAR = -431
+private const val TIMELINE_MAX_YEAR = 1892
+
+/** Typeset timeline: ticks + labels drawn on Canvas, colors from the theme. */
+@Composable
+private fun TimelinePlate(modifier: Modifier = Modifier) {
+    val lineColor = MaterialTheme.colorScheme.outline
+    val tickColor = MaterialTheme.colorScheme.tertiary
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val yearColor = MaterialTheme.colorScheme.outline
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = labelColor)
+    val yearStyle = MaterialTheme.typography.labelMedium.copy(color = yearColor)
+    val textMeasurer = rememberTextMeasurer()
+
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val span = (TIMELINE_MAX_YEAR - TIMELINE_MIN_YEAR).toFloat()
+        val xOf = { year: Int -> ((year - TIMELINE_MIN_YEAR) / span) * w }
+        val axisY = h * 0.5f
+
+        drawLine(lineColor, Offset(0f, axisY), Offset(w, axisY), strokeWidth = 1.5.dp.toPx())
+
+        val rowsAbove = floatArrayOf(h * 0.34f, h * 0.12f)
+        val rowsBelow = floatArrayOf(h * 0.72f, h * 0.92f)
+
+        fun drawCentered(text: String, style: TextStyle, x: Float, y: Float) {
+            val layout = textMeasurer.measure(text, style)
+            drawText(layout, topLeft = Offset(x - layout.size.width / 2f, y - layout.size.height / 2f))
+        }
+
+        for (event in PLATE_TIMELINE_EVENTS) {
+            val x1 = xOf(event.fromYear)
+            val x2 = xOf(event.toYear)
+            val range = event.fromYear != event.toYear
+            if (range) {
+                // Lifespan: thin bracket above the axis joining the two ticks.
+                drawLine(tickColor, Offset(x1, axisY - h * 0.06f), Offset(x2, axisY - h * 0.06f), strokeWidth = 1.2.dp.toPx())
+                drawCentered(event.label, labelStyle, (x1 + x2) / 2f, rowsAbove[event.row])
+                drawCentered("${event.fromYear} – ${event.toYear}", yearStyle, (x1 + x2) / 2f, rowsBelow[event.row])
+            } else {
+                drawCentered(event.label, labelStyle, x1, rowsAbove[event.row])
+                val yearLabel = if (event.fromYear < 0) "${-event.fromYear} BC" else "${event.fromYear}"
+                drawCentered(yearLabel, yearStyle, x1, rowsBelow[event.row])
+            }
+            drawLine(tickColor, Offset(x1, axisY - 7.dp.toPx()), Offset(x1, axisY + 7.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+            if (range) {
+                drawLine(tickColor, Offset(x2, axisY - 7.dp.toPx()), Offset(x2, axisY + 7.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+            }
+        }
     }
 }
 
