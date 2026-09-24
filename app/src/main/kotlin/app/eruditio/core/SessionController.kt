@@ -47,6 +47,7 @@ class SessionController(
     private val ledger: LedgerStore,
     private val interceptionLog: InterceptionLog,
     private val sessionLog: SessionLog,
+    private val positionStore: PositionStore,
     private val concepts: ConceptSource,
     private val gate: TrialGate,
     private val clock: Clock,
@@ -65,15 +66,26 @@ class SessionController(
         interceptionLog.record(targetPackage, InterceptionResult.CONTINUED, clock.epochDay)
     }
 
-    /** User chose "read instead": record the outcome and open a real session at `startChar`. */
-    suspend fun replaceWithSession(targetPackage: String, textId: String, startChar: Long = 0): SessionStart {
+    /** User chose "read instead": record the outcome and open a real session at the text's stored position. */
+    suspend fun replaceWithSession(targetPackage: String, textId: String): SessionStart {
         interceptionLog.record(targetPackage, InterceptionResult.REPLACED, clock.epochDay)
-        return startSession(textId, startChar)
+        return openSession(textId)
     }
 
-    suspend fun startSession(textId: String, startChar: Long = 0): SessionStart =
+    /**
+     * Open a reading session, resuming at the text's stored position (0 where
+     * none exists). The resume-at-last-position policy lives behind PositionStore.
+     */
+    suspend fun openSession(textId: String): SessionStart =
         if (gate.unlocked()) {
-            SessionStart.Opened(sessionLog.start(textId, startChar, clock.epochDay, clock.epochMillis))
+            SessionStart.Opened(
+                sessionLog.start(
+                    textId,
+                    positionStore.restoreOffset(textId) ?: 0L,
+                    clock.epochDay,
+                    clock.epochMillis,
+                ),
+            )
         } else {
             SessionStart.Locked
         }
@@ -164,6 +176,11 @@ interface InterceptionLog {
 
     /** Of those, how many became reading sessions (the *replaced* path). */
     suspend fun weeklyReplaced(todayEpochDay: Long): Int
+}
+
+/** The reader's resume-at-last-position policy: an offset primitive, never an entity. */
+interface PositionStore {
+    suspend fun restoreOffset(textId: String): Long?
 }
 
 interface SessionLog {

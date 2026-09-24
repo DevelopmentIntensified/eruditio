@@ -8,6 +8,7 @@ import app.eruditio.core.InterceptionResult
 import app.eruditio.core.LedgerEntry
 import app.eruditio.core.LedgerStore
 import app.eruditio.core.ConceptSource
+import app.eruditio.core.PositionStore
 import app.eruditio.core.SessionLog
 import app.eruditio.core.SessionRecord
 import kotlinx.coroutines.sync.Mutex
@@ -112,4 +113,8 @@ class FakeEntitlementStore : EntitlementStore {
     var value = Entitlement()
     override suspend fun entitlement(): Entitlement = value
     override suspend fun save(entitlement: Entitlement) { value = entitlement }
+}
+
+class FakePositionStore(private val offsets: Map<String, Long> = emptyMap()) : PositionStore {
+    override suspend fun restoreOffset(textId: String): Long? = offsets[textId]
 }
