@@ -1,0 +1,42 @@
+package app.eruditio.data
+
+import android.content.Context
+import org.json.JSONArray
+
+/** One bundled classic (assets/texts/<file>); carries its content group for handoff. */
+data class TextMeta(
+    val id: String,
+    val title: String,
+    val author: String,
+    val file: String,
+    val group: String,
+)
+
+class TextLibrary(private val context: Context) {
+
+    val texts: List<TextMeta> by lazy { loadIndex() }
+
+    fun meta(textId: String): TextMeta? = texts.firstOrNull { it.id == textId }
+
+    fun text(textId: String): String {
+        val file = requireMeta(textId).file
+        return context.assets.open("texts/$file").bufferedReader().use { it.readText() }
+    }
+
+    private fun requireMeta(textId: String): TextMeta =
+        texts.firstOrNull { it.id == textId } ?: error("Unknown text $textId")
+
+    private fun loadIndex(): List<TextMeta> {
+        val json = JSONArray(context.assets.open("texts/index.json").bufferedReader().use { it.readText() })
+        return (0 until json.length()).map { i ->
+            val o = json.getJSONObject(i)
+            TextMeta(
+                o.getString("id"),
+                o.getString("title"),
+                o.getString("author"),
+                o.getString("file"),
+                o.getString("group"),
+            )
+        }
+    }
+}

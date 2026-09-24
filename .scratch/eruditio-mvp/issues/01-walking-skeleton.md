@@ -11,3 +11,7 @@
 - [ ] Local database creates its schema on first run
 - [ ] A first unit test at the review-scheduler seam runs and passes (empty ledger → empty due set)
 - [ ] No interception permission requested yet; app is otherwise inert
+
+## Comments
+
+**2026-09-24 — agent**: Implemented on main: Gradle 8.14.3 + AGP 8.13.2 + Kotlin 2.2.21 + Compose BOM, Room schema (positions/sessions/interceptions/ledger/entitlement), `EruditioApp` shell with bottom nav (Today/Library/Review/Progress), first seam test at the `ReviewScheduler` seam (empty ledger → empty due set) passing via `:app:testDebugUnitTest`. Interception permissions intentionally not requested yet (per ticket). Device/emulator install pending — smoke noted for release ticket.

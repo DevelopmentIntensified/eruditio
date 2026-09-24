@@ -1,0 +1,39 @@
+package app.eruditio.data
+
+import android.app.Application
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverter
+import androidx.room.TypeConverters
+
+class Converters {
+    @TypeConverter fun longToBoxed(v: Long?): Long? = v
+}
+
+@Database(
+    entities = [
+        ReadingPositionEntity::class,
+        SessionEntity::class,
+        InterceptionEntity::class,
+        LedgerEntity::class,
+        EntitlementEntity::class,
+    ],
+    version = 1,
+    exportSchema = false,
+)
+@TypeConverters(Converters::class)
+abstract class EruditioDatabase : RoomDatabase() {
+    abstract fun readingPositionDao(): ReadingPositionDao
+    abstract fun sessionDao(): SessionDao
+    abstract fun interceptionDao(): InterceptionDao
+    abstract fun ledgerDao(): LedgerDao
+    abstract fun entitlementDao(): EntitlementDao
+
+    companion object {
+        fun build(context: Application): EruditioDatabase =
+            Room.databaseBuilder(context, EruditioDatabase::class.java, "eruditio.db")
+                .fallbackToDestructiveMigration()
+                .build()
+    }
+}

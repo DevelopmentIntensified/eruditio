@@ -10,3 +10,7 @@
 - [ ] Reading position restores exactly after app restart
 - [ ] Completing a session records a completion (visible in app records)
 - [ ] Everything works in airplane mode
+
+## Comments
+
+**2026-09-24 — user (wireframe direction)**: Variant A (Paper) wins; bottom nav pinned always; percent rings from variant C reused in A; library compact like B. Theme picking added: curated named palettes (Paper/Ink/Sepia/Terminal, Omarchy/nvim-style) on the Progress screen; prototype set captured at branch `prototype/ui-wireframes`.

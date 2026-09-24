@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder launcher glyph: an open book silhouette. Replaced at release ticket. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#221F1A"
+        android:pathData="M54,32 C46,26 38,24 30,24 L30,76 C38,76 46,78 54,82 C62,78 70,76 78,76 L78,24 C70,24 62,26 54,32 Z M52,32 L56,32 L56,80 L52,80 Z" />
+</vector>

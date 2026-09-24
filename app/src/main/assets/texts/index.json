@@ -1,0 +1,177 @@
+[
+  {
+    "id": "apology",
+    "title": "Apology",
+    "author": "Plato",
+    "file": "apology.txt",
+    "group": "ancient"
+  },
+  {
+    "id": "crito",
+    "title": "Crito",
+    "author": "Plato",
+    "file": "crito.txt",
+    "group": "ancient"
+  },
+  {
+    "id": "euthyphro",
+    "title": "Euthyphro",
+    "author": "Plato",
+    "file": "euthyphro.txt",
+    "group": "ancient"
+  },
+  {
+    "id": "meno",
+    "title": "Meno",
+    "author": "Plato",
+    "file": "meno.txt",
+    "group": "ancient"
+  },
+  {
+    "id": "phaedo",
+    "title": "Phaedo",
+    "author": "Plato",
+    "file": "phaedo.txt",
+    "group": "ancient"
+  },
+  {
+    "id": "phaedrus",
+    "title": "Phaedrus",
+    "author": "Plato",
+    "file": "phaedrus.txt",
+    "group": "ancient"
+  },
+  {
+    "id": "republic",
+    "title": "The Republic",
+    "author": "Plato",
+    "file": "republic.txt",
+    "group": "ancient"
+  },
+  {
+    "id": "meditations",
+    "title": "Meditations",
+    "author": "Marcus Aurelius",
+    "file": "meditations.txt",
+    "group": "ancient"
+  },
+  {
+    "id": "enchiridion",
+    "title": "Enchiridion",
+    "author": "Epictetus",
+    "file": "enchiridion.txt",
+    "group": "ancient"
+  },
+  {
+    "id": "golden-sayings",
+    "title": "The Golden Sayings of Epictetus",
+    "author": "Epictetus",
+    "file": "golden-sayings.txt",
+    "group": "ancient"
+  },
+  {
+    "id": "odyssey",
+    "title": "The Odyssey",
+    "author": "Homer",
+    "file": "odyssey.txt",
+    "group": "ancient"
+  },
+  {
+    "id": "aeneid",
+    "title": "The Aeneid",
+    "author": "Virgil",
+    "file": "aeneid.txt",
+    "group": "ancient"
+  },
+  {
+    "id": "consolation",
+    "title": "The Consolation of Philosophy",
+    "author": "Boethius",
+    "file": "consolation.txt",
+    "group": "ancient"
+  },
+  {
+    "id": "pilgrims-progress",
+    "title": "The Pilgrim's Progress",
+    "author": "John Bunyan",
+    "file": "pilgrims-progress.txt",
+    "group": "christian"
+  },
+  {
+    "id": "imitation",
+    "title": "The Imitation of Christ",
+    "author": "Thomas a Kempis",
+    "file": "imitation.txt",
+    "group": "christian"
+  },
+  {
+    "id": "presence",
+    "title": "The Practice of the Presence of God",
+    "author": "Brother Lawrence",
+    "file": "presence.txt",
+    "group": "christian"
+  },
+  {
+    "id": "confessions",
+    "title": "The Confessions of St. Augustine",
+    "author": "Augustine",
+    "file": "confessions.txt",
+    "group": "christian"
+  },
+  {
+    "id": "city-of-god",
+    "title": "The City of God",
+    "author": "Augustine",
+    "file": "city-of-god.txt",
+    "group": "christian"
+  },
+  {
+    "id": "sermons-1",
+    "title": "Spurgeon's Sermons, Volume 1",
+    "author": "C. H. Spurgeon",
+    "file": "sermons-1.txt",
+    "group": "christian"
+  },
+  {
+    "id": "sermons-2",
+    "title": "Spurgeon's Sermons, Volume 2",
+    "author": "C. H. Spurgeon",
+    "file": "sermons-2.txt",
+    "group": "christian"
+  },
+  {
+    "id": "sermons-3",
+    "title": "Spurgeon's Sermons, Volume 3",
+    "author": "C. H. Spurgeon",
+    "file": "sermons-3.txt",
+    "group": "christian"
+  },
+  {
+    "id": "retrospect",
+    "title": "A Retrospect",
+    "author": "J. Hudson Taylor",
+    "file": "retrospect.txt",
+    "group": "biography"
+  },
+  {
+    "id": "woolman",
+    "title": "The Journal of John Woolman",
+    "author": "John Woolman",
+    "file": "woolman.txt",
+    "group": "biography"
+  },
+  {
+    "id": "carey",
+    "title": "The Life of William Carey",
+    "author": "George Smith",
+    "file": "carey.txt",
+    "group": "biography"
+  },
+  {
+    "id": "livingstone",
+    "title": "The Personal Life of David Livingstone",
+    "author": "J. Gilchrist Lawson",
+    "file": "livingstone.txt",
+    "group": "biography"
+  }
+]
