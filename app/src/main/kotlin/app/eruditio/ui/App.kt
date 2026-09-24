@@ -53,7 +53,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import app.eruditio.BuildConfig
-import app.eruditio.core.Groups
 import app.eruditio.core.RecallGrade
 import app.eruditio.core.WeekDot
 import app.eruditio.ui.theme.EruditioTheme
@@ -196,7 +195,7 @@ private fun HomeScreen(
                 if (state.recent.isEmpty()) {
                     Text("Begin here", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     val progressById by vm.progressById.collectAsState()
-                    val unstarted = vm.texts.filter { (progressById[it.id] ?: 0) == 0 }.take(3)
+                    val unstarted = vm.texts.filter { isUnstarted(progressById[it.id] ?: 0) }.take(3)
                     if (unstarted.isEmpty()) {
                         Text("All texts have progress — pick up any classic from the Library.", style = MaterialTheme.typography.bodyMedium)
                     }
@@ -309,20 +308,7 @@ private fun HomeScreen(
     }
 }
 
-/** Library segment bar: content groups, cycled by tap (variant B). */
-private enum class Segment(val label: String, val group: String?) {
-    All("All", null),
-    Classics("Classics", Groups.ANCIENT),
-    Christian("Christian", Groups.CHRISTIAN),
-    Lives("Lives", Groups.BIOGRAPHY),
-}
-
-/** Progress pill modes: read percent (0..100) decides inclusion. */
-private enum class ProgressMode(val label: String, val matches: (Int) -> Boolean) {
-    Any("any progress", { _ -> true }),
-    InProgress("in progress", { pct -> pct in 1..99 }),
-    Unread("unread", { pct -> pct == 0 }),
-}
+/** Segment and ProgressMode live in LibrarySelection.kt (pure, JVM-tested). */
 
 /**
  * Library, prototype variant B (owner verdict): segmented group bar replaces
@@ -338,13 +324,7 @@ private fun LibraryScreen(vm: EruditioViewModel, modifier: Modifier) {
     var query by rememberSaveable { mutableStateOf("") }
     var progressMode by rememberSaveable { mutableStateOf(ProgressMode.Any) }
 
-    val filtered = vm.texts.filter { t ->
-        (segment.group == null || t.group == segment.group) &&
-            (query.isBlank() ||
-                t.title.contains(query, ignoreCase = true) ||
-                t.author.contains(query, ignoreCase = true)) &&
-            progressMode.matches(progressById[t.id] ?: 0)
-    }
+    val filtered = LibraryFilter(segment, query, progressMode).apply(vm.texts, progressById)
 
     Column(
         modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),

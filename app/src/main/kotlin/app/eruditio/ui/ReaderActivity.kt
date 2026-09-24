@@ -438,13 +438,15 @@ private fun ReadingBody(
                         container.positions.save(loaded.textId, resumeStart, firstVisible)
                         // Recommended next reading: another unstarted classic,
                         // same content group first (in-app momentum over feeds).
-                        val next = container.library.texts.firstOrNull {
-                            it.id != loaded.textId && it.group == loaded.group &&
-                                container.sessions.readPercent(it.id, container.textLength(it.id)) == 0
-                        } ?: container.library.texts.firstOrNull {
-                            it.id != loaded.textId &&
-                                container.sessions.readPercent(it.id, container.textLength(it.id)) == 0
+                        val progressById = container.library.texts.associate {
+                            it.id to container.sessions.readPercent(it.id, container.textLength(it.id))
                         }
+                        val next = suggestedNext(
+                            container.library.texts,
+                            progressById,
+                            loaded.textId,
+                            loaded.group,
+                        )
                         onCompleted(CompletedView(loaded.title, done, next))
                     }
                 }
