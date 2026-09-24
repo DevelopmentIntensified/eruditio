@@ -287,57 +287,131 @@ private fun HomeScreen(
     }
 }
 
-/** Compact, dense list (variant B) with percent rings (variant C), grouped. */
+/**
+ * Library, prototype variant B (owner verdict): segmented group bar replaces
+ * section headers, a search field hides behind a tap, and a progress pill
+ * cycles any / in progress / unread. The list is always flat with a match
+ * count that reflects all active filters composed. Rows keep the reader flow.
+ */
 @Composable
 private fun LibraryScreen(vm: EruditioViewModel, modifier: Modifier) {
     val progressById by vm.progressById.collectAsState()
-    val sections = remember(vm.texts) {
-        vm.texts.groupBy { it.group }
-    }
-    val sectionTitles = mapOf(
-        "ancient" to "Classics",
-        "christian" to "Christian writing",
-        "biography" to "Lives",
+    val segments = listOf(
+        "All" to null,
+        "Classics" to "ancient",
+        "Christian" to "christian",
+        "Lives" to "biography",
     )
+    var segment by rememberSaveable { mutableStateOf(0) }
+    var searching by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    val progressModes = listOf("any progress", "in progress", "unread")
+    var progressMode by rememberSaveable { mutableStateOf(0) }
+
+    val filtered = vm.texts.filter { t ->
+        val (_, group) = segments[segment]
+        (group == null || t.group == group) &&
+            (query.isBlank() ||
+                t.title.contains(query, ignoreCase = true) ||
+                t.author.contains(query, ignoreCase = true)) &&
+            when (progressMode) {
+                1 -> (progressById[t.id] ?: 0) in 1..99
+                2 -> (progressById[t.id] ?: 0) == 0
+                else -> true
+            }
+    }
+
     Column(
         modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
     ) {
         Text("Library", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = 16.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                progressModes[progressMode],
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.clickable { progressMode = (progressMode + 1) % progressModes.size },
+            )
+            if (searching) {
+                androidx.compose.material3.TextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    placeholder = { Text("Search title or author") },
+                    trailingIcon = {
+                        Text(
+                            "✕",
+                            modifier = Modifier.clickable { query = ""; searching = false },
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                Text(
+                    "Search",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { searching = true },
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            segments.forEachIndexed { index, (label, _) ->
+                val selected = index == segment
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            RoundedCornerShape(999.dp),
+                        )
+                        .clickable { segment = index }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
+        }
         Text(
-            "30 classics, bundled and offline",
+            "${filtered.size} of ${vm.texts.size}",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 12.dp),
         )
-        Spacer(Modifier.height(8.dp))
-        sections.forEach { (group, texts) ->
-            Text(
-                sectionTitles[group] ?: group.replaceFirstChar { it.uppercase() },
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
-            )
-            texts.forEach { t ->
-                val pct = progressById[t.id] ?: 0
-                Row(
-                    Modifier.fillMaxWidth().clickable { vm.startReading(t.id) }.padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(t.title, style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            t.author,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (pct > 0) Ring(pct / 100f) else Text(
+        Spacer(Modifier.height(4.dp))
+        filtered.forEach { t ->
+            val pct = progressById[t.id] ?: 0
+            Row(
+                Modifier.fillMaxWidth().clickable { vm.startReading(t.id) }.padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(t.title, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        t.author,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                when {
+                    pct == 100 -> Text(
+                        "read",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    pct > 0 -> Ring(pct / 100f)
+                    else -> Text(
                         "unread",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
             }
+            HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
         }
     }
 }
