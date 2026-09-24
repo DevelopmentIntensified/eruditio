@@ -51,7 +51,7 @@ class AppContainer(private val app: Application) {
     val themes = ThemeStore(app)
     val reading = ReadingSettings(app)
     val billing = PlayBillingGate(app, trial)
-    val positions = ReadingPositions(db.readingPositionDao())
+    val positions = ReadingPositions(db.readingPositionDao(), clock)
     val interceptionLog = RoomInterceptionLog(db.interceptionDao())
     val scheduler = ReviewScheduler()
     val ledger: LedgerStore = RoomLedgerStore(db.ledgerDao())
@@ -76,15 +76,6 @@ class AppContainer(private val app: Application) {
     )
 
     private val textLengths = mutableMapOf<String, Int>()
-
-    /** Rough reading progress for library rows, as a percent (0 when unread). */
-    suspend fun lastReadPercent(textId: String): Int {
-        val position = positions.restore(textId) ?: return 0
-        if (position.charOffset <= 0) return 0
-        val length = textLength(textId)
-        if (length <= 0) return 0
-        return ((position.charOffset * 100) / length).toInt().coerceIn(0, 100)
-    }
 
     fun textLength(textId: String): Int =
         textLengths.getOrPut(textId) { library.text(textId).length }

@@ -139,6 +139,35 @@ class SessionController(
         }
     }
 
+    /** The most recent completed sessions (Home's history strip). */
+    suspend fun recentSessions(limit: Int = 5): List<SessionRecord> = sessionLog.recent(limit)
+
+    /** The session record behind a reader, as a core value — never an entity. */
+    suspend fun sessionFor(sessionId: Long): SessionRecord? = sessionLog.get(sessionId)
+
+    /** Time spent in the reading surface, accumulated for the open session. */
+    suspend fun addReadingTime(sessionId: Long, millis: Long) = sessionLog.addReadingTime(sessionId, millis)
+
+    /** Rough reading progress as a percent. The caller supplies the text's
+     *  character length (a library concern); the seam only owns the stored
+     *  offset. 0 when unread, capped at 100. */
+    suspend fun readPercent(textId: String, textLength: Int): Int {
+        val offset = positionStore.restoreOffset(textId) ?: return 0
+        if (offset <= 0 || textLength <= 0) return 0
+        return ((offset * 100) / textLength).toInt().coerceIn(0, 100)
+    }
+
+    /** Concepts per mastery level as of today, decay applied at query time. */
+    suspend fun masteryCounts(): MasteryCounts {
+        val today = clock.epochDay
+        val byLevel = ledger.all().groupingBy { scheduler.effectiveMastery(it, today) }.eachCount()
+        return MasteryCounts(
+            familiar = byLevel[MasteryLevel.FAMILIAR] ?: 0,
+            proficient = byLevel[MasteryLevel.PROFICIENT] ?: 0,
+            mastered = byLevel[MasteryLevel.MASTERED] ?: 0,
+        )
+    }
+
     suspend fun weeklyInterceptions(): Int = interceptionLog.weeklyCount(clock.epochDay)
 
     /** Of this week's interceptions, how many became reading sessions. */

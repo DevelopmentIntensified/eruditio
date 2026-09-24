@@ -139,7 +139,7 @@ class ReaderActivity : androidx.activity.ComponentActivity() {
         val spent = System.currentTimeMillis() - since
         val container = (application as EruditioApp).container
         lifecycleScope.launch {
-            container.sessionLog.addReadingTime(sessionId, spent)
+            container.sessions.addReadingTime(sessionId, spent)
         }
     }
 
@@ -183,7 +183,7 @@ private fun ReaderScreen(container: AppContainer, sessionId: Long) {
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(sessionId) {
-        val record = container.sessionLog.get(sessionId) ?: return@LaunchedEffect
+        val record = container.sessions.sessionFor(sessionId) ?: return@LaunchedEffect
         val text = container.library.text(record.textId)
         val meta = container.library.meta(record.textId)
         val readerText = ReaderText.of(text, meta?.group.orEmpty())
@@ -439,9 +439,11 @@ private fun ReadingBody(
                         // Recommended next reading: another unstarted classic,
                         // same content group first (in-app momentum over feeds).
                         val next = container.library.texts.firstOrNull {
-                            it.id != loaded.textId && it.group == loaded.group && container.lastReadPercent(it.id) == 0
+                            it.id != loaded.textId && it.group == loaded.group &&
+                                container.sessions.readPercent(it.id, container.textLength(it.id)) == 0
                         } ?: container.library.texts.firstOrNull {
-                            it.id != loaded.textId && container.lastReadPercent(it.id) == 0
+                            it.id != loaded.textId &&
+                                container.sessions.readPercent(it.id, container.textLength(it.id)) == 0
                         }
                         onCompleted(CompletedView(loaded.title, done, next))
                     }
