@@ -133,7 +133,7 @@ class SessionController(
      *  pending (gold ring) until a session completes today. */
     suspend fun weekDots(): List<WeekDot> {
         val completed = sessionLog.completedEpochDays()
-        val today = clock.epochDay
+        val today = trailingWeek.todayEpochDay
         return trailingWeek.dayRange.map { day ->
             WeekDot(epochDay = day, hasCompletedSession = day in completed, today = day == today)
         }
@@ -141,6 +141,9 @@ class SessionController(
 
     /** The most recent completed sessions (Home's history strip). */
     suspend fun recentSessions(limit: Int = 5): List<SessionRecord> = sessionLog.recent(limit)
+
+    /** The pause screen's default text: what the user read last. */
+    suspend fun resumeTextId(): String? = positionStore.lastReadTextId()
 
     /** The session record behind a reader, as a core value — never an entity. */
     suspend fun sessionFor(sessionId: Long): SessionRecord? = sessionLog.get(sessionId)
@@ -213,6 +216,9 @@ interface InterceptionLog {
 /** The reader's resume-at-last-position policy: an offset primitive, never an entity. */
 interface PositionStore {
     suspend fun restoreOffset(textId: String): Long?
+
+    /** The text the user read most recently (the pause screen's default). */
+    suspend fun lastReadTextId(): String?
 }
 
 interface SessionLog {

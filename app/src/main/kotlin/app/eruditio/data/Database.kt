@@ -19,7 +19,7 @@ class Converters {
         LedgerEntity::class,
         EntitlementEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -38,10 +38,17 @@ abstract class EruditioDatabase : RoomDatabase() {
             }
         }
 
+        /** v3: dropped reading_positions.paragraphIndex (write-only — the reader
+         *  re-derives the item index from charOffset via ReaderText). */
+        private val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE reading_positions DROP COLUMN paragraph_index")
+            }
+        }
+
         fun build(context: Application): EruditioDatabase =
             Room.databaseBuilder(context, EruditioDatabase::class.java, "eruditio.db")
-                .addMigrations(MIGRATION_1_2)
-                .fallbackToDestructiveMigration()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }

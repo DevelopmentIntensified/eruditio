@@ -146,7 +146,7 @@ class PauseActivity : androidx.activity.ComponentActivity() {
 
     private fun replace(target: String, container: app.eruditio.AppContainer) {
         scope.launch {
-            val defaultText = container.positions.lastReadTextId()
+            val defaultText = container.sessions.resumeTextId()
                 ?: container.library.texts.firstOrNull()?.id
                 ?: return@launch
             when (val start = container.sessions.replaceWithSession(target, defaultText)) {

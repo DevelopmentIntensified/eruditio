@@ -236,7 +236,7 @@ private fun ReadingBody(
     fun saveTopLine() {
         val idx = readerText.textIndexOf(listState.firstVisibleItemIndex)
         val start = readerText.startCharAt(idx) ?: return
-        scope.launch { container.positions.save(loaded.textId, start, idx) }
+        scope.launch { container.positions.save(loaded.textId, start) }
     }
 
     LaunchedEffect(loaded) {
@@ -261,7 +261,7 @@ private fun ReadingBody(
                 .collect { listIdx ->
                     val idx = readerText.textIndexOf(listIdx)
                     val start = readerText.startCharAt(idx) ?: return@collect
-                    container.positions.save(loaded.textId, start, idx)
+                    container.positions.save(loaded.textId, start)
                 }
         }
     }
@@ -302,7 +302,7 @@ private fun ReadingBody(
         onRegisterFlush(null)
         val end = readerText.segmentEndAfter(checkpoint)
         scope.launch {
-            container.positions.save(loaded.textId, items[checkpoint].startChar, checkpoint)
+            container.positions.save(loaded.textId, items[checkpoint].startChar)
             container.sessions.completeSession(loaded.sessionId, end)
             // Land on Home/Today when the shell returns (consumed in App.kt).
             container.pauseToHome.value = true
@@ -435,12 +435,10 @@ private fun ReadingBody(
                     val done = container.sessions.completeSession(loaded.sessionId, end)
                     if (done != null) {
                         val resumeStart = readerText.items[firstVisible].startChar
-                        container.positions.save(loaded.textId, resumeStart, firstVisible)
+                        container.positions.save(loaded.textId, resumeStart)
                         // Recommended next reading: another unstarted classic,
                         // same content group first (in-app momentum over feeds).
-                        val progressById = container.library.texts.associate {
-                            it.id to container.sessions.readPercent(it.id, container.textLength(it.id))
-                        }
+                        val progressById = container.progressById()
                         val next = suggestedNext(
                             container.library.texts,
                             progressById,

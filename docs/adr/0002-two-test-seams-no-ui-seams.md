@@ -2,7 +2,7 @@
 
 The testable logic concentrates in two pure seams — `SessionController` (OS event/decision/session lifecycle: friction decisions, outcome recording, replace→session, check-ins) and `ReviewScheduler` (the mastery ledger and due/challenge logic). Both are Android-free and the OS watcher, overlay, and UI are replaceable details behind them. No test seams exist inside UI: Compose screens and activities are verified by manual device smoke, not by seam fakes.
 
-Amendment (deepening 1): the two seams remain the external contract consumed by the OS and UI layers. Pure core modules and their store ports (e.g. `PositionStore`) count as the core's test surface with internal seams — faked at the core boundary without dragging Android types in.
+Amendment (deepening 1): the two seams remain the external contract consumed by the OS and UI layers. Pure core modules and their store ports (e.g. `PositionStore`) count as the core's test surface with internal seams — faked at the core boundary without dragging Android types in. Pure predicate modules living under `ui/` but carrying no Android/Compose imports (e.g. `LibrarySelection`) count as the core's JVM-tested surface too: the "no test seams inside UI" rule targets UI surfaces, not pure files.
 
 Status: accepted
 

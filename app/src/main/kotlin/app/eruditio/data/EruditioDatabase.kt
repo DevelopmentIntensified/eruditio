@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.Flow
 data class ReadingPositionEntity(
     @PrimaryKey val textId: String,
     val charOffset: Long,
-    val paragraphIndex: Int,
     val updatedAtMillis: Long,
 )
 

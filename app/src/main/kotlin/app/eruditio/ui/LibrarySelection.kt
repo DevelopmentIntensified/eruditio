@@ -18,6 +18,12 @@ import app.eruditio.data.TextMeta
  */
 fun isUnstarted(percent: Int): Boolean = percent == 0
 
+/** The one started predicate: percent above 0 (VM progress counts). */
+fun isStarted(percent: Int): Boolean = percent > 0
+
+/** The one read-through predicate: percent at or past 100 (VM progress counts). */
+fun isReadThrough(percent: Int): Boolean = percent >= 100
+
 /** Library segment bar: content groups, cycled by tap (variant B). */
 enum class Segment(val label: String, val group: String?) {
     All("All", null),

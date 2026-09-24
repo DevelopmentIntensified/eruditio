@@ -62,6 +62,8 @@ class AppContainer(private val app: Application) {
     val positionStore: PositionStore = object : PositionStore {
         override suspend fun restoreOffset(textId: String): Long? =
             positions.restore(textId)?.charOffset
+
+        override suspend fun lastReadTextId(): String? = positions.lastReadTextId()
     }
 
     val sessions: SessionController = SessionController(
@@ -79,4 +81,10 @@ class AppContainer(private val app: Application) {
 
     fun textLength(textId: String): Int =
         textLengths.getOrPut(textId) { library.text(textId).length }
+
+    /** Library progress map (percent by text id), assembled once: a
+     *  composition-root query aggregation — owns library order, text lengths
+     *  and the per-text readPercent seam call, so no consumer rebuilds it. */
+    suspend fun progressById(): Map<String, Int> =
+        library.texts.associate { it.id to sessions.readPercent(it.id, textLength(it.id)) }
 }
