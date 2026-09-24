@@ -18,35 +18,35 @@ from pathlib import Path
 SOURCES = [
     # id, file, title, author, group
     ("apology", 1656, "Apology", "Plato", "ancient"),
-    ("crito", 1576, "Crito", "Plato", "ancient"),
+    ("crito", 1657, "Crito", "Plato", "ancient"),
     ("euthyphro", 1642, "Euthyphro", "Plato", "ancient"),
-    ("meno", 1800, "Meno", "Plato", "ancient"),
-    ("phaedo", 1655, "Phaedo", "Plato", "ancient"),
+    ("meno", 1643, "Meno", "Plato", "ancient"),
+    ("phaedo", 1658, "Phaedo", "Plato", "ancient"),
     ("phaedrus", 1636, "Phaedrus", "Plato", "ancient"),
     ("republic", 1497, "The Republic", "Plato", "ancient"),
     ("meditations", 2680, "Meditations", "Marcus Aurelius", "ancient"),
     ("enchiridion", 45109, "Enchiridion", "Epictetus", "ancient"),
-    ("golden-sayings", 4709, "The Golden Sayings of Epictetus", "Epictetus", "ancient"),
+    ("golden-sayings", 871, "The Golden Sayings of Epictetus", "Epictetus", "ancient"),
     ("odyssey", 1727, "The Odyssey", "Homer", "ancient"),
     ("aeneid", 228, "The Aeneid", "Virgil", "ancient"),
-    ("consolation", 34911, "The Consolation of Philosophy", "Boethius", "ancient"),
+    ("consolation", 14328, "The Consolation of Philosophy", "Boethius", "ancient"),
     ("pilgrims-progress", 131, "The Pilgrim's Progress", "John Bunyan", "christian"),
-    ("imitation", 4783, "The Imitation of Christ", "Thomas a Kempis", "christian"),
-    ("presence", 5658, "The Practice of the Presence of God", "Brother Lawrence", "christian"),
+    ("imitation", 1653, "The Imitation of Christ", "Thomas a Kempis", "christian"),
+    ("presence", 5657, "The Practice of the Presence of God", "Brother Lawrence", "christian"),
     ("confessions", 3296, "The Confessions of St. Augustine", "Augustine", "christian"),
     ("city-of-god", 45304, "The City of God", "Augustine", "christian"),
-    ("sermons-1", 1901, "Spurgeon's Sermons, Volume 1", "C. H. Spurgeon", "christian"),
-    ("sermons-2", 1902, "Spurgeon's Sermons, Volume 2", "C. H. Spurgeon", "christian"),
-    ("sermons-3", 1903, "Spurgeon's Sermons, Volume 3", "C. H. Spurgeon", "christian"),
+    ("sermons-1", 42518, "Talks to Farmers", "C. H. Spurgeon", "christian"),
+    ("sermons-2", 42558, "The Art of Illustration", "C. H. Spurgeon", "christian"),
+    ("sermons-3", 42657, "Gleanings among the Sheaves", "C. H. Spurgeon", "christian"),
     ("kjv-psalms", 10, "Psalms", "KJV", "christian"),
     ("kjv-proverbs", 10, "Proverbs", "KJV", "christian"),
     ("kjv-ecclesiastes", 10, "Ecclesiastes", "KJV", "christian"),
     ("kjv-john", 10, "The Gospel of John", "KJV", "christian"),
     ("kjv-matthew", 10, "The Gospel of Matthew", "KJV", "christian"),
-    ("retrospect", 10739, "A Retrospect", "J. Hudson Taylor", "biography"),
+    ("retrospect", 26744, "A Retrospect", "J. Hudson Taylor", "biography"),
     ("woolman", 22613, "The Journal of John Woolman", "John Woolman", "biography"),
-    ("carey", 6303, "The Life of William Carey", "George Smith", "biography"),
-    ("livingstone", 13256, "The Personal Life of David Livingstone", "J. Gilchrist Lawson", "biography"),
+    ("carey", 2056, "The Life of William Carey", "George Smith", "biography"),
+    ("livingstone", 13262, "The Personal Life of David Livingstone", "William Garden Blaikie", "biography"),
 ]
 
 START = re.compile(r"^\*\*\*\s*START OF (THE|THIS) PROJECT GUTENBERG EBOOK.*$", re.I | re.M)
@@ -71,25 +71,25 @@ def strip_branding(text: str) -> str:
 def extract_kjv(text: str, book_header: str) -> str:
     """Cut one book out of the KJV plain text (PG#10).
 
-    Each book header appears twice: once in the TOC at the front and once at
-    the start of the actual text. The real start is the last occurrence
-    followed within a few lines by a verse marker like '1:1 '.
+    Each book header appears in the front-matter TOC and again at the start
+    of the actual text; the content occurrence is the one followed within a
+    few lines by a verse marker like '1:1 '. Books are separated by runs of
+    4+ blank lines, so the book ends at the next such run.
     """
     verse = re.compile(r"^\d+:\d+ ", re.M)
-    starts = [m.start() for m in re.finditer(re.escape(book_header), text)]
+    if "\r" in text:  # some mirrors serve CRLF; blank-line runs are \r\n then
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
     idx = None
-    for cand in starts:
-        if verse.search(text[cand: cand + 500]):
-            idx = cand
+    for m in re.finditer(re.escape(book_header), text):
+        if verse.search(text, m.start(), min(m.start() + 600, len(text))):
+            idx = m.start()
             break
     if idx is None:
         raise ValueError(f"KJV book not found: {book_header}")
-    end = len(text)
-    for off in range(idx + 1, len(text)):
-        if re.match(r"(The Book|The Gospel|The First|The Second|The Third|The Epistle|The Acts|The Revelation|The General|The Lamentations|The Song)", text[off:]) and not verse.search(text[off: off + 500]):
-            end = off
-            break
-    return text[idx: end].strip() + "\n"
+    sep = re.compile(r"\n{4,}").search(text, idx + 1)
+    if not sep:
+        raise ValueError(f"KJV book end not found: {book_header}")
+    return text[idx: sep.start()].strip() + "\n"
 
 
 def main(outdir: str) -> None:
@@ -116,7 +116,7 @@ def main(outdir: str) -> None:
                 body = strip_branding(raw)
             if len(body) < 5_000:
                 raise ValueError(f"too small: {len(body)} chars")
-            dest.write_text(body, encoding="utf-8")
+            dest.write_text(body, encoding="utf-8", newline="\n")
             index.append({"id": slug, "title": title, "author": author, "file": f"{slug}.txt", "group": group})
             print(f"ok   {slug:16s} {len(body):>9,} chars  pg{gid}")
         except Exception as e:

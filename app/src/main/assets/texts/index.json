@@ -127,23 +127,58 @@
   },
   {
     "id": "sermons-1",
-    "title": "Spurgeon's Sermons, Volume 1",
+    "title": "Talks to Farmers",
     "author": "C. H. Spurgeon",
     "file": "sermons-1.txt",
     "group": "christian"
   },
   {
     "id": "sermons-2",
-    "title": "Spurgeon's Sermons, Volume 2",
+    "title": "The Art of Illustration",
     "author": "C. H. Spurgeon",
     "file": "sermons-2.txt",
     "group": "christian"
   },
   {
     "id": "sermons-3",
-    "title": "Spurgeon's Sermons, Volume 3",
+    "title": "Gleanings among the Sheaves",
     "author": "C. H. Spurgeon",
     "file": "sermons-3.txt",
+    "group": "christian"
+  },
+  {
+    "id": "kjv-psalms",
+    "title": "Psalms",
+    "author": "KJV",
+    "file": "kjv-psalms.txt",
+    "group": "christian"
+  },
+  {
+    "id": "kjv-proverbs",
+    "title": "Proverbs",
+    "author": "KJV",
+    "file": "kjv-proverbs.txt",
+    "group": "christian"
+  },
+  {
+    "id": "kjv-ecclesiastes",
+    "title": "Ecclesiastes",
+    "author": "KJV",
+    "file": "kjv-ecclesiastes.txt",
+    "group": "christian"
+  },
+  {
+    "id": "kjv-john",
+    "title": "The Gospel of John",
+    "author": "KJV",
+    "file": "kjv-john.txt",
+    "group": "christian"
+  },
+  {
+    "id": "kjv-matthew",
+    "title": "The Gospel of Matthew",
+    "author": "KJV",
+    "file": "kjv-matthew.txt",
     "group": "christian"
   },
   {
@@ -170,7 +205,7 @@
   {
     "id": "livingstone",
     "title": "The Personal Life of David Livingstone",
-    "author": "J. Gilchrist Lawson",
+    "author": "William Garden Blaikie",
     "file": "livingstone.txt",
     "group": "biography"
   }

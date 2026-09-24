@@ -9,3 +9,9 @@ captures/
 .cxx/
 keystore/
 keystore.properties
+# scratch working files from the text-library fetch session (tools/ scripts are tracked)
+tools/pg_catalog.csv
+tools/catalog.rdf.bz2
+/pgsearch.html
+/s1.html
+/s2.html
