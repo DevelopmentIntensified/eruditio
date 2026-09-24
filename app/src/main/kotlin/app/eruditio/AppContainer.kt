@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import app.eruditio.core.ConceptSource
 import app.eruditio.core.LedgerStore
+import app.eruditio.core.PositionStore
 import app.eruditio.core.ReviewScheduler
 import app.eruditio.core.SessionController
 import app.eruditio.core.SessionLog
@@ -57,11 +58,18 @@ class AppContainer(private val app: Application) {
     val concepts: ConceptSource = SegmentConcepts(library)
     val sessionLog: SessionLog = RoomSessionLog(db.sessionDao())
 
+    /** Seam adapter: offset primitive only — Room entities never cross into the core. */
+    val positionStore: PositionStore = object : PositionStore {
+        override suspend fun restoreOffset(textId: String): Long? =
+            positions.restore(textId)?.charOffset
+    }
+
     val sessions: SessionController = SessionController(
         scheduler = scheduler,
         ledger = ledger,
         interceptionLog = interceptionLog,
         sessionLog = sessionLog,
+        positionStore = positionStore,
         concepts = concepts,
         gate = trial,
         clock = clock,

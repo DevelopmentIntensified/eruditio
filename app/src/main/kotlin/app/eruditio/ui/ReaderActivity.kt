@@ -825,7 +825,7 @@ private fun CompletedBody(container: AppContainer, s: CompletedView) {
             OutlinedButton(
                 onClick = {
                     scope.launch {
-                        when (val start = container.sessions.startSession(next.id, 0L)) {
+                        when (val start = container.sessions.openSession(next.id)) {
                             is app.eruditio.core.SessionStart.Opened -> {
                                 openReader(context, start.sessionId)
                                 (context as? Activity)?.finish()

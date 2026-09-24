@@ -149,8 +149,7 @@ class PauseActivity : androidx.activity.ComponentActivity() {
             val defaultText = container.positions.lastReadTextId()
                 ?: container.library.texts.firstOrNull()?.id
                 ?: return@launch
-            val startChar = container.positions.restore(defaultText)?.charOffset ?: 0L
-            when (val start = container.sessions.replaceWithSession(target, defaultText, startChar)) {
+            when (val start = container.sessions.replaceWithSession(target, defaultText)) {
                 is SessionStart.Opened -> {
                     openReader(this@PauseActivity, start.sessionId)
                     finish()

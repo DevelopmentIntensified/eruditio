@@ -2,6 +2,7 @@ package app.eruditio
 
 import app.eruditio.core.InterceptionDecision
 import app.eruditio.core.InterceptionResult
+import app.eruditio.core.PositionStore
 import app.eruditio.core.ReviewScheduler
 import app.eruditio.core.SessionController
 import app.eruditio.core.SessionStart
@@ -31,6 +32,7 @@ class SessionControllerTest {
         day: Long = 100,
         friction: Boolean = true,
         isDebug: Boolean = false,
+        positionStore: PositionStore = FakePositionStore(),
     ): Pair<TestClock, SessionController> {
         val clock = TestClock(day)
         val controller = SessionController(
@@ -38,6 +40,7 @@ class SessionControllerTest {
             ledger = ledger,
             interceptionLog = interceptLog,
             sessionLog = sessionLog,
+            positionStore = positionStore,
             concepts = concepts,
             gate = TrialGate(entitlement, isDebug = isDebug),
             clock = clock,
@@ -73,8 +76,10 @@ class SessionControllerTest {
 
     @Test
     fun `replace records replaced and opens a real session at the last position`() = runTest {
-        val controller = makeController().second
-        val start = controller.replaceWithSession("com.instagram.android", "demo:republic", startChar = 4321)
+        val controller = makeController(
+            positionStore = FakePositionStore(mapOf("demo:republic" to 4321L)),
+        ).second
+        val start = controller.replaceWithSession("com.instagram.android", "demo:republic")
         assertTrue(start is SessionStart.Opened)
         assertEquals(listOf(InterceptionResult.REPLACED), interceptLog.all.map { it.result })
         val record = sessionLog.get((start as SessionStart.Opened).sessionId)!!
@@ -85,7 +90,7 @@ class SessionControllerTest {
     @Test
     fun `completing a session changes the due-review set`() = runTest {
         val (clock, controller) = makeController()
-        val opened = controller.startSession("demo:apology") as SessionStart.Opened
+        val opened = controller.openSession("demo:apology") as SessionStart.Opened
         assertTrue(controller.dueToday().isEmpty()) // nothing due today
         val completed = controller.completeSession(opened.sessionId, endChar = 900)
         assertEquals(1, completed?.newConcepts) // the completed segment feeds the engine
@@ -96,9 +101,9 @@ class SessionControllerTest {
     @Test
     fun `re-reading the same segment enrolls concepts once`() = runTest {
         val controller = makeController().second
-        val s1 = controller.startSession("demo:apology") as SessionStart.Opened
+        val s1 = controller.openSession("demo:apology") as SessionStart.Opened
         controller.completeSession(s1.sessionId, 900)
-        val s2 = controller.startSession("demo:apology") as SessionStart.Opened
+        val s2 = controller.openSession("demo:apology") as SessionStart.Opened
         val completed2 = controller.completeSession(s2.sessionId, 1800)
         assertEquals(0, completed2?.newConcepts)
         assertEquals(1, ledger.all().size)
@@ -122,7 +127,7 @@ class SessionControllerTest {
         controller.completeSession(s1.sessionId, 900)
         assertEquals(1, controller.currentStreak())
         clock.advance(1)
-        val s2 = controller.startSession("demo:apology") as SessionStart.Opened
+        val s2 = controller.openSession("demo:apology") as SessionStart.Opened
         controller.completeSession(s2.sessionId, 1800)
         assertEquals(2, controller.currentStreak())
         clock.advance(1)
@@ -150,7 +155,7 @@ class SessionControllerTest {
     @Test
     fun `reading minutes are minutes, not raw millis`() = runTest {
         val controller = makeController().second
-        val opened = controller.startSession("crito", 0L)
+        val opened = controller.openSession("crito")
         val sessionId = (opened as SessionStart.Opened).sessionId
         // ~3 minutes of real reading time lands as millis on the session log.
         sessionLog.addReadingTime(sessionId, 181_759L)
@@ -171,17 +176,18 @@ class SessionControllerTest {
             ledger = ledger,
             interceptionLog = interceptLog,
             sessionLog = sessionLog,
+            positionStore = FakePositionStore(),
             concepts = concepts,
             gate = TrialGate(entitlement, isDebug = false),
             clock = clock,
         )
         // A session inside local day today-6, also inside the UTC blind spot.
         clock.instantMillis = today.minusDays(6).atTime(0, 30).atZone(zone).toInstant().toEpochMilli()
-        val early = controller.startSession("crito") as SessionStart.Opened
+        val early = controller.openSession("crito") as SessionStart.Opened
         sessionLog.addReadingTime(early.sessionId, 60_000L)
         // A session at local 01:00 today — after local midnight, before UTC midnight.
         clock.instantMillis = today.atTime(1, 0).atZone(zone).toInstant().toEpochMilli()
-        val late = controller.startSession("demo:apology") as SessionStart.Opened
+        val late = controller.openSession("demo:apology") as SessionStart.Opened
         sessionLog.addReadingTime(late.sessionId, 120_000L)
 
         assertEquals(2L, controller.minutesToday()) // only today's local-day session
@@ -192,18 +198,44 @@ class SessionControllerTest {
     fun `gate - trial ends, purchase unlocks`() = runTest {
         val (clock, controller) = makeController()
         repeat(TrialGate.FREE_SESSION_LIMIT) {
-            val s = controller.startSession("demo:apology") as SessionStart.Opened
+            val s = controller.openSession("demo:apology") as SessionStart.Opened
             controller.completeSession(s.sessionId, 900)
             clock.advance(1)
         }
-        assertEquals(SessionStart.Locked, controller.startSession("demo:apology"))
+        assertEquals(SessionStart.Locked, controller.openSession("demo:apology"))
         TrialGate(entitlement, isDebug = false).markOwned()
-        assertTrue(controller.startSession("demo:apology") is SessionStart.Opened)
+        assertTrue(controller.openSession("demo:apology") is SessionStart.Opened)
     }
 
     @Test
     fun `gate - debug builds bypass the lock`() = runTest {
         val controller = makeController(isDebug = true).second
-        assertTrue(controller.startSession("demo:apology") is SessionStart.Opened)
+        assertTrue(controller.openSession("demo:apology") is SessionStart.Opened)
+    }
+
+    @Test
+    fun `openSession resumes at the stored offset`() = runTest {
+        val controller = makeController(
+            positionStore = FakePositionStore(mapOf("demo:republic" to 4321L)),
+        ).second
+        val opened = controller.openSession("demo:republic") as SessionStart.Opened
+        assertEquals(4321L, sessionLog.get(opened.sessionId)!!.startChar)
+    }
+
+    @Test
+    fun `openSession with no stored position starts at the beginning`() = runTest {
+        val controller = makeController().second
+        val opened = controller.openSession("demo:republic") as SessionStart.Opened
+        assertEquals(0L, sessionLog.get(opened.sessionId)!!.startChar)
+    }
+
+    @Test
+    fun `replaceWithSession records REPLACED and resumes at the stored offset`() = runTest {
+        val controller = makeController(
+            positionStore = FakePositionStore(mapOf("demo:republic" to 4321L)),
+        ).second
+        val start = controller.replaceWithSession("com.instagram.android", "demo:republic") as SessionStart.Opened
+        assertEquals(listOf(InterceptionResult.REPLACED), interceptLog.all.map { it.result })
+        assertEquals(4321L, sessionLog.get(start.sessionId)!!.startChar)
     }
 }

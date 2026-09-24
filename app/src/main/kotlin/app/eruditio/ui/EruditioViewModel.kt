@@ -202,8 +202,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
 
     fun startReading(textId: String) {
         viewModelScope.launch {
-            val startChar = container.positions.restore(textId)?.charOffset ?: 0L
-            when (val start = container.sessions.startSession(textId, startChar)) {
+            when (val start = container.sessions.openSession(textId)) {
                 is SessionStart.Opened -> openReader(container.appContext, start.sessionId)
                 SessionStart.Locked -> refresh() // trial over: the purchase card surfaces on Home
             }
