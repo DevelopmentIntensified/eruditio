@@ -71,8 +71,9 @@ private data class Loaded(
     val title: String,
     val author: String,
     val group: String,
-    val text: String,
-    val startParagraph: Int,
+    val items: List<ReaderItem>,
+    val startItem: Int,
+    val textLength: Long,
 )
 
 private data class CompletedView(
@@ -80,6 +81,56 @@ private data class CompletedView(
     val completed: CompletedSession,
     val handoff: app.eruditio.core.HandoffLink?,
 )
+
+/** One scroll item: a paragraph, or a single line of an oversized block. */
+private data class ReaderItem(
+    val text: String,
+    val startChar: Long,
+    val startsParagraph: Boolean,
+)
+
+private const val MAX_ITEM_CHARS = 2000
+
+/**
+ * Split with cumulative character offsets for exact restore. Blocks split on
+ * blank lines keep their offsets; a block larger than a couple of screens
+ * (verse runs with no blank lines) is cut into per-line items so progress and
+ * restore stay granular instead of jumping to 100% on one check-in.
+ */
+private fun readerItems(text: String): List<ReaderItem> {
+    val items = mutableListOf<ReaderItem>()
+    var start = 0L
+    for (block in text.split("\n\n")) {
+        val blockStart = start
+        start += block.length.toLong() + 2
+        if (block.isBlank()) continue
+        val trimmed = block.trim()
+        if (trimmed.length <= MAX_ITEM_CHARS) {
+            items += ReaderItem(trimmed, blockStart, true)
+        } else {
+            var idx = 0
+            var first = true
+            for (line in block.split("\n")) {
+                val t = line.trim()
+                if (t.isNotEmpty()) {
+                    items += ReaderItem(t, blockStart + idx, first)
+                    first = false
+                }
+                idx += line.length + 1
+            }
+        }
+    }
+    if (items.isEmpty()) items += ReaderItem(text.trim(), 0L, true)
+    return items
+}
+
+private fun itemIndexAt(items: List<ReaderItem>, charOffset: Long): Int {
+    var best = 0
+    for ((index, item) in items.withIndex()) {
+        if (item.startChar <= charOffset) best = index else break
+    }
+    return best
+}
 
 @OptIn(FlowPreview::class)
 @Composable
@@ -92,14 +143,16 @@ private fun ReaderScreen(container: AppContainer, sessionId: Long) {
         val record = container.sessionLog.get(sessionId) ?: return@LaunchedEffect
         val text = container.library.text(record.textId)
         val meta = container.library.meta(record.textId)
+        val items = readerItems(text)
         loaded.value = Loaded(
             sessionId = sessionId,
             textId = record.textId,
             title = meta?.title ?: record.textId,
             author = meta?.author.orEmpty(),
             group = meta?.group.orEmpty(),
-            text = text,
-            startParagraph = paragraphIndexAt(record.startChar, text),
+            items = items,
+            startItem = itemIndexAt(items, record.startChar),
+            textLength = text.length.toLong(),
         )
     }
 
@@ -114,12 +167,12 @@ private fun ReaderScreen(container: AppContainer, sessionId: Long) {
 @Composable
 private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (CompletedView) -> Unit) {
     val listState = rememberLazyListState()
-    val paragraphs = remember(loaded.text) { splitParagraphs(loaded.text) }
-    val starts = remember(paragraphs) { paragraphs.map { it.second } } // startChar per paragraph
+    val items = loaded.items
+    val starts = remember(items) { items.map { it.startChar } }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(loaded) {
-        if (loaded.startParagraph > 0) listState.scrollToItem(loaded.startParagraph)
+        if (loaded.startItem > 0) listState.scrollToItem(loaded.startItem)
     }
 
     LaunchedEffect(listState, loaded) {
@@ -144,18 +197,19 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(24.dp),
         ) {
-            items(paragraphs.size) { i ->
+            items(items.size) { i ->
+                val item = items[i]
                 Text(
-                    paragraphs[i].first,
-                    Modifier.fillMaxWidth().padding(bottom = 14.dp),
+                    item.text,
+                    Modifier.fillMaxWidth().padding(top = if (i > 0 && item.startsParagraph) 14.dp else 0.dp),
                     style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 30.sp),
                 )
             }
         }
         Button(
             onClick = {
-                val last = (listState.firstVisibleItemIndex + 8).coerceAtMost(paragraphs.size - 1)
-                val end = starts.getOrNull(last + 1) ?: loaded.text.length.toLong()
+                val last = (listState.firstVisibleItemIndex + 8).coerceAtMost(items.size - 1)
+                val end = starts.getOrNull(last + 1) ?: loaded.textLength
                 scope.launch {
                     val done = container.sessions.completeSession(loaded.sessionId, end)
                     if (done != null) {
@@ -171,6 +225,8 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
 
 @Composable
 private fun CompletedBody(container: AppContainer, s: CompletedView) {
+    // Compose context here is the ReaderActivity; the app context cannot start activities or finish.
+    val context = LocalContext.current
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Session complete", style = MaterialTheme.typography.headlineMedium)
         Text("${s.title} · +${s.completed.newConcepts} review cards")
@@ -180,38 +236,13 @@ private fun CompletedBody(container: AppContainer, s: CompletedView) {
                     Text("One next step", style = MaterialTheme.typography.labelMedium)
                     Text(link.title, style = MaterialTheme.typography.bodyLarge)
                     OutlinedButton(onClick = {
-                        (container.appContext as Activity).startActivity(
-                            Intent(Intent.ACTION_VIEW, link.url.toUri()),
-                        )
+                        context.startActivity(Intent(Intent.ACTION_VIEW, link.url.toUri()))
                     }) { Text("Open") }
                     Text("Shown only right after a session.", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
-        Button(onClick = { (container.appContext as? Activity)?.finish() }, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+        Button(onClick = { (context as? Activity)?.finish() }, modifier = Modifier.fillMaxWidth()) { Text("Done") }
     }
 }
 
-/** Paragraph split keeping cumulative character offsets for exact restore. */
-private fun splitParagraphs(text: String): List<Pair<String, Long>> {
-    val out = mutableListOf<Pair<String, Long>>()
-    var start = 0L
-    for (block in text.split("\n\n")) {
-        val trimmed = block.trim()
-        if (trimmed.isNotEmpty()) out += trimmed to start
-        start += block.length.toLong() + 2
-    }
-    if (out.isEmpty()) out += text to 0L
-    return out
-}
-
-private fun paragraphIndexAt(charOffset: Long, text: String): Int {
-    var index = 0
-    var start = 0L
-    for (block in text.split("\n\n")) {
-        if (start > charOffset) return maxOf(0, index - 1)
-        start += block.length.toLong() + 2
-        index++
-    }
-    return maxOf(0, index - 1)
-}

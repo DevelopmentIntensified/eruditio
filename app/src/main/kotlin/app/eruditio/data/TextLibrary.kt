@@ -20,7 +20,11 @@ class TextLibrary(private val context: Context) {
 
     fun text(textId: String): String {
         val file = requireMeta(textId).file
+        // PG plain text comes in three line-ending vintages (\r\n, old \r\r\n,
+        // rare bare \r); normalize all so splitting and offset arithmetic see
+        // one consistent separator.
         return context.assets.open("texts/$file").bufferedReader().use { it.readText() }
+            .replace("\r\r\n", "\n").replace("\r\n", "\n").replace('\r', '\n')
     }
 
     private fun requireMeta(textId: String): TextMeta =
