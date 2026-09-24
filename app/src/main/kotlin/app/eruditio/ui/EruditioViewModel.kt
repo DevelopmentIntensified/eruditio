@@ -13,6 +13,7 @@ import app.eruditio.core.RecallGrade
 import app.eruditio.core.SessionRecord
 import app.eruditio.core.SessionStart
 import app.eruditio.core.TrialGate
+import app.eruditio.core.WeekDot
 import app.eruditio.intercept.TargetApp
 import app.eruditio.intercept.TargetApps
 import app.eruditio.ui.theme.Palette
@@ -60,6 +61,8 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         val weekly: Int = 0,
         val replaced: Int = 0,
         val streak: Int = 0,
+        /** Trailing 7 local days, oldest first (ticket 19 week strip). */
+        val weekDots: List<WeekDot> = emptyList(),
     )
 
     private val homeState = MutableStateFlow(HomeState())
@@ -168,6 +171,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
                 weekly = container.sessions.weeklyInterceptions(),
                 replaced = container.interceptionLog.weeklyReplaced(container.today()),
                 streak = container.sessions.currentStreak(),
+                weekDots = container.sessions.weekDots(),
             )
         }
     }

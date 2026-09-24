@@ -3,8 +3,10 @@ package app.eruditio.ui
 import android.content.Intent
 import android.app.Activity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -39,13 +42,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import app.eruditio.BuildConfig
 import app.eruditio.core.RecallGrade
+import app.eruditio.core.WeekDot
 import app.eruditio.ui.theme.EruditioTheme
 import app.eruditio.ui.theme.Palettes
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
 
 /**
  * The app shell (wireframe variant A "Paper", refined per direction): pinned
@@ -509,10 +518,103 @@ private fun ProgressScreen(
                 )
             }
         }
-        Text("🔥 Streak: ${state.streak} day(s) — habit, not mastery", style = MaterialTheme.typography.bodyLarge)
+        StreakHead(state)
         OutlinedButton(onClick = onOpenLibrary, modifier = Modifier.fillMaxWidth()) { Text("Open Library") }
     }
 }
+
+/**
+ * Streak head (prototype page=week, variant B — owner verdict): the day count
+ * is primary with "day streak" beneath, and the compact 7-dot strip is
+ * secondary. Filled dot = a day with a completed session (session log),
+ * gold ring = today, pending until a session completes today. Habit, not
+ * mastery — the mastery card above stays untouched.
+ */
+@Composable
+private fun StreakHead(state: EruditioViewModel.ProgressState) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Column {
+                    Text("${state.streak}", style = MaterialTheme.typography.headlineLarge)
+                    Text(
+                        "day streak",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                WeekDots(state.weekDots)
+            }
+            Text(
+                "Habit, not mastery",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** The trailing week as dots: 11dp circle over a one-letter day label. */
+@Composable
+private fun WeekDots(days: List<WeekDot>) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        days.forEach { day ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                val filled = day.hasCompletedSession
+                Box(
+                    Modifier
+                        .size(15.dp)
+                        .then(
+                            if (day.today) {
+                                Modifier.border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), CircleShape)
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .padding(2.dp)
+                        .size(11.dp)
+                        .background(
+                            if (filled) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                            CircleShape,
+                        )
+                        .border(
+                            width = 1.5.dp,
+                            color = when {
+                                day.today -> MaterialTheme.colorScheme.primary
+                                filled -> MaterialTheme.colorScheme.onSurface
+                                else -> MaterialTheme.colorScheme.outline
+                            },
+                            shape = CircleShape,
+                        ),
+                )
+                Text(
+                    dayLetter(day.epochDay),
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** Weekday initial (M, T, W, …) for a dot's label, in the device locale. */
+private fun dayLetter(epochDay: Long): String =
+    LocalDate.ofEpochDay(epochDay)
+        .dayOfWeek
+        .getDisplayName(TextStyle.NARROW, Locale.getDefault())
 
 /** Settings: theme, intercepted apps, debug surfaces. */
 @Composable

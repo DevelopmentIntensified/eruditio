@@ -130,6 +130,22 @@ class SessionControllerTest {
     }
 
     @Test
+    fun `week dots cover the trailing seven days - today pending until completed`() = runTest {
+        val (clock, controller) = makeController()
+        val s = controller.replaceWithSession("com.instagram.android", "demo:apology") as SessionStart.Opened
+        controller.completeSession(s.sessionId, 900)
+        val dots = controller.weekDots()
+        assertEquals(7, dots.size)
+        assertEquals(clock.epochDay - 6, dots.first().epochDay)
+        assertTrue(dots.dropLast(1).none { it.hasCompletedSession || it.today })
+        assertTrue(dots.last().today && dots.last().hasCompletedSession) // session completed today: filled
+        clock.advance(1) // a new day with no session yet: today stays pending
+        val next = controller.weekDots()
+        assertTrue(next.last().today && !next.last().hasCompletedSession)
+        assertEquals(true, next[5].hasCompletedSession) // yesterday keeps its dot
+    }
+
+    @Test
     fun `gate - trial ends, purchase unlocks`() = runTest {
         val (clock, controller) = makeController()
         repeat(TrialGate.FREE_SESSION_LIMIT) {

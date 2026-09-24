@@ -116,6 +116,17 @@ class SessionController(
     suspend fun currentStreak(): Int =
         Streak.current(sessionLog.completedEpochDays().toSet(), clock.epochDay)
 
+    /** The trailing 7 local days as week-strip dots (ticket 19): filled on
+     *  days with a completed session; today flagged so the UI can render it
+     *  pending (gold ring) until a session completes today. */
+    suspend fun weekDots(): List<WeekDot> {
+        val completed = sessionLog.completedEpochDays()
+        val today = clock.epochDay
+        return ((today - 6)..today).map { day ->
+            WeekDot(epochDay = day, hasCompletedSession = day in completed, today = day == today)
+        }
+    }
+
     suspend fun weeklyInterceptions(): Int = interceptionLog.weeklyCount(clock.epochDay)
 
     /** Of this week's interceptions, how many became reading sessions. */
@@ -178,6 +189,13 @@ interface Clock {
     val epochDay: Long
     val epochMillis: Long
 }
+
+/** One local day in the trailing week (ticket 19): the Progress strip's per-day state. */
+data class WeekDot(
+    val epochDay: Long,
+    val hasCompletedSession: Boolean,
+    val today: Boolean,
+)
 
 object Streak {
     /**
