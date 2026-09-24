@@ -116,6 +116,10 @@ class FakeEntitlementStore : EntitlementStore {
     override suspend fun save(entitlement: Entitlement) { value = entitlement }
 }
 
-class FakePositionStore(private val offsets: Map<String, Long> = emptyMap()) : PositionStore {
+class FakePositionStore(
+    private val offsets: Map<String, Long> = emptyMap(),
+    private val lastTextId: String? = null,
+) : PositionStore {
     override suspend fun restoreOffset(textId: String): Long? = offsets[textId]
+    override suspend fun lastReadTextId(): String? = lastTextId
 }

@@ -120,8 +120,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
                 sessionsThisWeek = container.sessions.weeklySessions(),
                 minutesToday = container.sessions.minutesToday(),
             )
-            textProgress.value =
-                texts.associate { it.id to container.sessions.readPercent(it.id, container.textLength(it.id)) }
+            textProgress.value = container.progressById()
             refreshReview()
             refreshProgress()
         }
@@ -168,8 +167,8 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
     private fun refreshProgress() {
         viewModelScope.launch {
             val mastery = container.sessions.masteryCounts()
-            val textsWithProgress = texts.count { (progressById.value[it.id] ?: 0) > 0 }
-            val readThrough = texts.count { (progressById.value[it.id] ?: 0) >= 100 }
+            val textsWithProgress = texts.count { isStarted(progressById.value[it.id] ?: 0) }
+            val readThrough = texts.count { isReadThrough(progressById.value[it.id] ?: 0) }
             // readingMinutes() returns MINUTES (the seam divides ms itself).
             val (weekMinutes, totalMinutes) = container.sessions.readingMinutes()
             progressState.value = ProgressState(

@@ -147,6 +147,6 @@ class EntitlementRepository(private val dao: EntitlementDao) : EntitlementStore 
 class ReadingPositions(private val dao: ReadingPositionDao, private val clock: DeviceClock) {
     suspend fun restore(textId: String): ReadingPositionEntity? = dao.get(textId)
     suspend fun lastReadTextId(): String? = dao.latest()?.textId
-    suspend fun save(textId: String, charOffset: Long, paragraphIndex: Int) =
-        dao.upsert(ReadingPositionEntity(textId, charOffset, paragraphIndex, clock.epochMillis))
+    suspend fun save(textId: String, charOffset: Long) =
+        dao.upsert(ReadingPositionEntity(textId, charOffset, clock.epochMillis))
 }
