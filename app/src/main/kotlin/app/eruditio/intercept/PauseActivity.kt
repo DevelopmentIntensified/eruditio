@@ -41,8 +41,9 @@ import kotlinx.coroutines.launch
 /**
  * The friction screen (verified PNAS mechanic, spec): a short delay with a
  * breathing mark, then an explicit choice. "Continue" goes straight into the
- * target app — never a hard block. "Read instead" starts a real session at the
- * last read position. Paper styling per the wireframe direction.
+ * target app — never a hard block — and waits out the delay. "Read instead" is
+ * available immediately: the friction must never obstruct the learning path.
+ * Paper styling per the wireframe direction.
  */
 class PauseActivity : androidx.activity.ComponentActivity() {
 
@@ -112,7 +113,6 @@ class PauseActivity : androidx.activity.ComponentActivity() {
             ) {
                 Button(
                     onClick = { replace(target, container) },
-                    enabled = enabled,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Read a page instead") }
                 OutlinedButton(

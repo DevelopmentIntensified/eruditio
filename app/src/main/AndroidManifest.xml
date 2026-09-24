@@ -42,6 +42,12 @@
             android:taskAffinity=""
             android:theme="@style/Theme.Eruditio.Pause" />
 
+        <!-- The quiet reading surface; both entry paths (home, pause) land here. -->
+        <activity
+            android:name=".ui.ReaderActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Eruditio" />
+
         <service
             android:name=".intercept.UsageStatsWatcherService"
             android:exported="false"
