@@ -341,8 +341,10 @@ private fun ReadingBody(
     }
 
     // Held so the checkpoint pause can stop a pending debounced save from
-    // overwriting the checkpoint position after it lands.
-    var saveJob: kotlinx.coroutines.Job? = null
+    // overwriting the checkpoint position after it lands. remember-backed so
+    // the cancel survives recomposition — a plain composition var reads the
+    // current frame's value and nulls out (Rail pattern below).
+    var saveJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     LaunchedEffect(listState, loaded) {
         saveJob = launch {
             snapshotFlow { listState.firstVisibleItemIndex }
