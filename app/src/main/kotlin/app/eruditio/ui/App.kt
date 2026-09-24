@@ -303,6 +303,21 @@ private fun HomeScreen(
     }
 }
 
+/** Library segment bar: content groups, cycled by tap (variant B). */
+private enum class Segment(val label: String, val group: String?) {
+    All("All", null),
+    Classics("Classics", "ancient"),
+    Christian("Christian", "christian"),
+    Lives("Lives", "biography"),
+}
+
+/** Progress pill modes: read percent (0..100) decides inclusion. */
+private enum class ProgressMode(val label: String, val matches: (Int) -> Boolean) {
+    Any("any progress", { _ -> true }),
+    InProgress("in progress", { pct -> pct in 1..99 }),
+    Unread("unread", { pct -> pct == 0 }),
+}
+
 /**
  * Library, prototype variant B (owner verdict): segmented group bar replaces
  * section headers, a search field hides behind a tap, and a progress pill
@@ -312,29 +327,17 @@ private fun HomeScreen(
 @Composable
 private fun LibraryScreen(vm: EruditioViewModel, modifier: Modifier) {
     val progressById by vm.progressById.collectAsState()
-    val segments = listOf(
-        "All" to null,
-        "Classics" to "ancient",
-        "Christian" to "christian",
-        "Lives" to "biography",
-    )
-    var segment by rememberSaveable { mutableStateOf(0) }
+    var segment by rememberSaveable { mutableStateOf(Segment.All) }
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
-    val progressModes = listOf("any progress", "in progress", "unread")
-    var progressMode by rememberSaveable { mutableStateOf(0) }
+    var progressMode by rememberSaveable { mutableStateOf(ProgressMode.Any) }
 
     val filtered = vm.texts.filter { t ->
-        val (_, group) = segments[segment]
-        (group == null || t.group == group) &&
+        (segment.group == null || t.group == segment.group) &&
             (query.isBlank() ||
                 t.title.contains(query, ignoreCase = true) ||
                 t.author.contains(query, ignoreCase = true)) &&
-            when (progressMode) {
-                1 -> (progressById[t.id] ?: 0) in 1..99
-                2 -> (progressById[t.id] ?: 0) == 0
-                else -> true
-            }
+            progressMode.matches(progressById[t.id] ?: 0)
     }
 
     Column(
@@ -346,10 +349,21 @@ private fun LibraryScreen(vm: EruditioViewModel, modifier: Modifier) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Ticket 13: the cycling progress filter is a pill, styled with the
+            // same RoundedCornerShape(999.dp) treatment as the segment bar
+            // (surface fill, outline edge) so the two read as one control row.
             Text(
-                progressModes[progressMode],
+                progressMode.label,
                 style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.clickable { progressMode = (progressMode + 1) % progressModes.size },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(999.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(999.dp))
+                    .clickable {
+                        val modes = ProgressMode.entries
+                        progressMode = modes[(progressMode.ordinal + 1) % modes.size]
+                    }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
             )
             if (searching) {
                 androidx.compose.material3.TextField(
@@ -376,10 +390,10 @@ private fun LibraryScreen(vm: EruditioViewModel, modifier: Modifier) {
         }
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            segments.forEachIndexed { index, (label, _) ->
-                val selected = index == segment
+            Segment.entries.forEach { candidate ->
+                val selected = candidate == segment
                 Text(
-                    label,
+                    candidate.label,
                     style = MaterialTheme.typography.labelLarge,
                     color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
@@ -387,7 +401,7 @@ private fun LibraryScreen(vm: EruditioViewModel, modifier: Modifier) {
                             if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                             RoundedCornerShape(999.dp),
                         )
-                        .clickable { segment = index }
+                        .clickable { segment = candidate }
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             }
@@ -567,7 +581,8 @@ private fun WeekDots(days: List<WeekDot>) {
                         .size(15.dp)
                         .then(
                             if (day.today) {
-                                Modifier.border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), CircleShape)
+                                // Ticket 19: today's pending halo is the notch gold (tertiary).
+                                Modifier.border(2.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f), CircleShape)
                             } else {
                                 Modifier
                             },
@@ -581,7 +596,8 @@ private fun WeekDots(days: List<WeekDot>) {
                         .border(
                             width = 1.5.dp,
                             color = when {
-                                day.today -> MaterialTheme.colorScheme.primary
+                                // Ticket 19: today's ring is the notch gold (tertiary).
+                                day.today -> MaterialTheme.colorScheme.tertiary
                                 filled -> MaterialTheme.colorScheme.onSurface
                                 else -> MaterialTheme.colorScheme.outline
                             },

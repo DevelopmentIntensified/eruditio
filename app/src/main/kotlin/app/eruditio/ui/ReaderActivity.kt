@@ -1,6 +1,7 @@
 package app.eruditio.ui
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
@@ -63,6 +64,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.eruditio.AppContainer
 import app.eruditio.EruditioApp
+import app.eruditio.MainActivity
 import app.eruditio.R
 import app.eruditio.core.CompletedSession
 import app.eruditio.ui.theme.EruditioTheme
@@ -81,8 +83,37 @@ class ReaderActivity : androidx.activity.ComponentActivity() {
 
     private var readingSince: Long? = null
 
-    /** Set by ReadingBody; flushes the current top-of-screen line position immediately. */
-    internal var flushPosition: (() -> Unit)? = null
+    /** Registered by ReadingBody; flushes the current top-of-screen line position immediately. */
+    private var flushPosition: (() -> Unit)? = null
+
+    /**
+     * ReadingBody wires (or clears) its top-line flush through this callback —
+     * the onCompleted pattern, so composition never downcasts to this activity.
+     */
+    internal fun registerFlush(flush: (() -> Unit)?) {
+        flushPosition = flush
+    }
+
+    /**
+     * Checkpoint-pause leave path (ticket 14): clear the flush synchronously so
+     * the pause-time onPause cannot overwrite the checkpoint save, then finish.
+     * When this reader is the task ROOT — an interception-initiated session:
+     * the pause overlay starts it with FLAG_ACTIVITY_NEW_TASK and finishes
+     * itself, leaving no shell beneath — bring the shell back explicitly so
+     * the user lands on Home/Today instead of dropping to the launcher.
+     * With a shell beneath (in-app sessions), plain finish() returns to it and
+     * App.kt consumes pauseToHome.
+     */
+    internal fun leaveAtCheckpoint() {
+        flushPosition = null
+        if (isTaskRoot) {
+            startActivity(
+                Intent(this, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            )
+        }
+        finish()
+    }
 
     override fun onResume() {
         super.onResume()
@@ -159,6 +190,10 @@ private const val MAX_ITEM_CHARS = 2000
  */
 private const val CHECKPOINT_SPACING = 12
 
+/** A TEXT-item index is a checkpoint when it sits at the spacing rhythm's end. */
+private fun isCheckpoint(textItemIndex: Int) =
+    textItemIndex % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1
+
 /**
  * Plate frontispiece (ticket 21): ancient-track texts (TextMeta.group ==
  * "ancient") prepend ONE plate item before all text items, like a book
@@ -173,6 +208,21 @@ private const val PLATE_ITEM_COUNT = 1
 /** Header offset for this text: 1 plate item for the ancient track, else 0. */
 private val Loaded.plateOffset: Int
     get() = if (group == "ancient") PLATE_ITEM_COUNT else 0
+
+/**
+ * Single source for the plate-offset boundary arithmetic: every scroll-list
+ * index read or written converts through these helpers, so the invariant —
+ * persisted state lives in TEXT-item space, the offset is applied only at
+ * list boundaries — holds by construction.
+ */
+/** Scroll-list index -> TEXT-item index, clamped above the plate header. */
+private fun Loaded.textIndexOf(listIdx: Int): Int = (listIdx - plateOffset).coerceAtLeast(0)
+
+/** TEXT-item index -> scroll-list index. */
+private fun Loaded.listIndexOf(textIdx: Int): Int = textIdx + plateOffset
+
+/** Scroll-list item count: every text item plus the plate header. */
+private val Loaded.listItemCount: Int get() = items.size + plateOffset
 
 /**
  * Split with cumulative character offsets for exact restore. Blocks split on
@@ -239,22 +289,35 @@ private fun ReaderScreen(container: AppContainer, sessionId: Long) {
         )
     }
 
+    // The activity owns pause-time flush wiring and the checkpoint leave path;
+    // the body reaches both through callbacks (the onCompleted pattern) instead
+    // of downcasting its compose context.
+    val activity = LocalContext.current as? ReaderActivity
     when {
         completed.value != null -> CompletedBody(container, completed.value!!)
-        loaded.value != null -> ReadingBody(container, loaded.value!!) { completed.value = it }
+        loaded.value != null -> ReadingBody(
+            container,
+            loaded.value!!,
+            onRegisterFlush = { flush -> activity?.registerFlush(flush) },
+            onLeave = { activity?.leaveAtCheckpoint() },
+        ) { completed.value = it }
         else -> Column(Modifier.fillMaxSize().padding(24.dp)) { Text("Loading…") }
     }
 }
 
 @OptIn(FlowPreview::class)
 @Composable
-private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (CompletedView) -> Unit) {
+private fun ReadingBody(
+    container: AppContainer,
+    loaded: Loaded,
+    onRegisterFlush: (flush: (() -> Unit)?) -> Unit,
+    onLeave: () -> Unit,
+    onCompleted: (CompletedView) -> Unit,
+) {
     val listState = rememberLazyListState()
     val items = loaded.items
     val starts = remember(items) { items.map { it.startChar } }
-    val plateOffset = loaded.plateOffset
     val scope = rememberCoroutineScope()
-    val activity = LocalContext.current as? ReaderActivity
 
     // The top visible line is the user's place: the debounced saver persists it
     // while scrolling, and activity pause flushes it immediately without waiting
@@ -262,30 +325,30 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
     // The list index is a text-item index + the plate offset; persisted saves
     // stay in TEXT-item space (the plate itself counts as "the beginning").
     fun saveTopLine() {
-        val idx = (listState.firstVisibleItemIndex - plateOffset).coerceAtLeast(0)
+        val idx = loaded.textIndexOf(listState.firstVisibleItemIndex)
         val start = starts.getOrNull(idx) ?: return
         scope.launch { container.positions.save(loaded.textId, start, idx) }
     }
 
     LaunchedEffect(loaded) {
-        if (loaded.startItem > 0) listState.scrollToItem(loaded.startItem + plateOffset)
+        if (loaded.startItem > 0) listState.scrollToItem(loaded.listIndexOf(loaded.startItem))
     }
 
-    DisposableEffect(activity, loaded) {
-        activity?.flushPosition = { saveTopLine() }
-        onDispose { activity?.flushPosition = null }
+    DisposableEffect(onRegisterFlush, loaded) {
+        onRegisterFlush { saveTopLine() }
+        onDispose { onRegisterFlush(null) }
     }
 
     // Held so the checkpoint pause can stop a pending debounced save from
     // overwriting the checkpoint position after it lands.
-    var saver: kotlinx.coroutines.Job? = null
+    var saveJob: kotlinx.coroutines.Job? = null
     LaunchedEffect(listState, loaded) {
-        saver = launch {
+        saveJob = launch {
             snapshotFlow { listState.firstVisibleItemIndex }
                 .debounce(600)
                 .distinctUntilChanged()
                 .collect { listIdx ->
-                    val idx = (listIdx - plateOffset).coerceAtLeast(0)
+                    val idx = loaded.textIndexOf(listIdx)
                     val start = starts.getOrNull(idx) ?: return@collect
                     container.positions.save(loaded.textId, start, idx)
                 }
@@ -295,13 +358,24 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
     // A checkpoint is "on screen" while any currently visible item carries the
     // checkpoint spacing; the chip shows for the nearest (topmost) one only.
     // Visible list indexes are translated back to TEXT-item space first.
-    val visibleCheckpoint by remember(listState, plateOffset) {
+    val visibleCheckpoint by remember(listState, loaded) {
         derivedStateOf {
             listState.layoutInfo.visibleItemsInfo
                 .asSequence()
-                .map { it.index - plateOffset }
-                .filter { it % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1 }
+                .map { loaded.textIndexOf(it.index) }
+                .filter(::isCheckpoint)
                 .minOrNull()
+        }
+    }
+
+    // Ticket 20: ALL on-screen checkpoint dots breathe — the visible TEXT-index
+    // window (not just the topmost checkpoint) gates the animation; dots off
+    // screen stay quiet. The pause chip below keeps its topmost-visible rule.
+    val visibleTextWindow by remember(listState, loaded) {
+        derivedStateOf {
+            val info = listState.layoutInfo.visibleItemsInfo
+            if (info.isEmpty()) null
+            else loaded.textIndexOf(info.minOf { it.index })..loaded.textIndexOf(info.maxOf { it.index })
         }
     }
 
@@ -310,26 +384,26 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
     // and the activity finishes without the completion screen — the user lands
     // back on the main app, which Home/Today consumes (see App.kt).
     fun pauseAtCheckpoint(checkpoint: Int) {
-        saver?.cancel()
-        val next = ((checkpoint + 1)..items.lastIndex)
-            .firstOrNull { it % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1 }
+        // Hardening: cancel the pending debounced save and suppress the
+        // pause-time flush synchronously, so neither can overwrite the
+        // checkpoint position after it lands.
+        saveJob?.cancel()
+        onRegisterFlush(null)
+        val next = ((checkpoint + 1)..items.lastIndex).firstOrNull(::isCheckpoint)
         val end = next?.let { starts[it] } ?: loaded.textLength
         scope.launch {
             container.positions.save(loaded.textId, starts[checkpoint], checkpoint)
             container.sessions.completeSession(loaded.sessionId, end)
             // Land on Home/Today when the shell returns (consumed in App.kt).
             container.pauseToHome.value = true
-            // onPause would otherwise flush the current top line over the
-            // checkpoint save; the checkpoint IS the user's place now.
-            activity?.flushPosition = null
-            activity?.finish()
+            onLeave()
         }
     }
 
     // Rail state: checkpoint item indexes and the togglable on/off.
     val railEnabled by container.reading.railEnabled.collectAsState()
     val checkpointIndexes = remember(items) {
-        items.indices.filter { it % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1 }.toIntArray()
+        items.indices.filter(::isCheckpoint).toIntArray()
     }
 
     // Full-screen plate viewer (map + timeline) over the ancient track.
@@ -348,8 +422,8 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(24.dp),
             ) {
-            items(items.size + plateOffset) { i ->
-                if (i < plateOffset) {
+            items(loaded.listItemCount) { i ->
+                if (i < loaded.plateOffset) {
                     // Ticket 21: the ancient-track frontispiece — a sourced
                     // map plate as the first list item, tap to open the
                     // full-screen plate viewer. Not part of the text: no
@@ -359,20 +433,21 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
                         modifier = Modifier.fillParentMaxWidth().fillParentMaxHeight(0.9f),
                     )
                 } else {
-                val item = items[i - plateOffset]
+                val textIndex = loaded.textIndexOf(i)
+                val item = items[textIndex]
                 Row(
                     Modifier.fillMaxWidth()
-                        .padding(top = if (i - plateOffset > 0 && item.startsParagraph) 14.dp else 0.dp),
+                        .padding(top = if (textIndex > 0 && item.startsParagraph) 14.dp else 0.dp),
                 ) {
                     // Constant 18dp start gutter; checkpoint rows carry a 9dp
                     // dot, every row indents alike so the text edge stays put.
                     // Checkpoints count TEXT items: the plate shifts the list
                     // index but never the checkpoint rhythm. Ticket 20 variant
-                    // B: the nearest on-screen dot breathes in the accent
-                    // color; the rest stay quiet (muted outline).
+                    // B: every dot whose TEXT index is on screen breathes in
+                    // the accent color; the rest stay quiet (muted outline).
                     Box(Modifier.width(18.dp)) {
-                        if ((i - plateOffset) % CHECKPOINT_SPACING == CHECKPOINT_SPACING - 1) {
-                            if (i - plateOffset == visibleCheckpoint) {
+                        if (isCheckpoint(textIndex)) {
+                            if (visibleTextWindow?.contains(textIndex) == true) {
                                 val accent = MaterialTheme.colorScheme.tertiary
                                 val breathe = rememberInfiniteTransition(label = "checkpoint-dot")
                                 val p by breathe.animateFloat(
@@ -421,8 +496,8 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
             // tracks raw list indexes, so it counts the plate too, while the
             // checkpoint tick indexes shift into list space by the offset.
             Rail(
-                checkpoints = checkpointIndexes.map { it + plateOffset }.toIntArray(),
-                itemCount = items.size + plateOffset,
+                checkpoints = checkpointIndexes.map { loaded.listIndexOf(it) }.toIntArray(),
+                itemCount = loaded.listItemCount,
                 listState = listState,
                 enabled = railEnabled,
                 scope = scope,
@@ -444,7 +519,7 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
                 // visible line itself, so a reopen lands on the exact line the
                 // user was reading at — never past it. List index -> text-item
                 // index via the plate offset; saves stay in TEXT-item space.
-                val firstVisible = (listState.firstVisibleItemIndex - plateOffset).coerceAtLeast(0)
+                val firstVisible = loaded.textIndexOf(listState.firstVisibleItemIndex)
                 val end = starts.getOrNull(firstVisible + 1) ?: loaded.textLength
                 scope.launch {
                     val done = container.sessions.completeSession(loaded.sessionId, end)
@@ -475,16 +550,12 @@ private fun ReadingBody(container: AppContainer, loaded: Loaded, onCompleted: (C
  * Ticket 21: the ancient-track frontispiece — the sourced public-domain map
  * (Shepherd 1926, Greece at the beginning of the Peloponnesian War, 431 BC)
  * shown at roughly screen height with a quiet caption, like a book plate.
+ * The tap-to-open layer is added here, at the call site.
  */
 @Composable
 private fun PlateFrontispiece(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.pointerInput(onOpen) { detectTapGestures { onOpen() } }) {
-        Image(
-            painter = painterResource(R.drawable.plate_greece_431bc),
-            contentDescription = "Map of Greece at the beginning of the Peloponnesian War, 431 BC",
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-        )
+        PlateImage(Modifier.weight(1f).fillMaxWidth())
         Text(
             "Plate I · Greece at the beginning of the Peloponnesian War, 431 BC — tap to open",
             style = MaterialTheme.typography.labelSmall,
@@ -493,6 +564,24 @@ private fun PlateFrontispiece(onOpen: () -> Unit, modifier: Modifier = Modifier)
         )
     }
 }
+
+/**
+ * Shared plate image (standards review): the bundled sourced map with its
+ * content description, rendered fit-to-width — one source for the
+ * frontispiece and the viewer's map page; captions stay at the call sites.
+ */
+@Composable
+private fun PlateImage(modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(R.drawable.plate_greece_431bc),
+        contentDescription = "Map of Greece at the beginning of the Peloponnesian War, 431 BC",
+        contentScale = ContentScale.Fit,
+        modifier = modifier,
+    )
+}
+
+/** The viewer's pages: page 0 the sourced map, page 1 the timeline. */
+private const val PLATE_PAGE_COUNT = 2
 
 /**
  * Full-screen plate viewer: the sourced map and the typeset timeline, paged
@@ -505,7 +594,7 @@ private fun PlateViewer(onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        val pagerState = rememberPagerState(pageCount = { 2 })
+        val pagerState = rememberPagerState(pageCount = { PLATE_PAGE_COUNT })
         Box(
             Modifier
                 .fillMaxSize()
@@ -521,12 +610,7 @@ private fun PlateViewer(onDismiss: () -> Unit) {
                         Modifier.fillMaxSize().padding(24.dp),
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        Image(
-                            painter = painterResource(R.drawable.plate_greece_431bc),
-                            contentDescription = "Map of Greece at the beginning of the Peloponnesian War, 431 BC",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                        )
+                        PlateImage(Modifier.weight(1f).fillMaxWidth())
                         PlateCaption("Plate I · Greece at the beginning of the Peloponnesian War, 431 BC")
                     }
                     else -> Column(
@@ -545,12 +629,12 @@ private fun PlateViewer(onDismiss: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "${pagerState.currentPage + 1} / 2",
+                    "${pagerState.currentPage + 1} / $PLATE_PAGE_COUNT",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(Modifier.padding(top = 8.dp)) {
-                    repeat(2) { dot ->
+                    repeat(PLATE_PAGE_COUNT) { dot ->
                         Box(
                             Modifier
                                 .padding(horizontal = 5.dp)

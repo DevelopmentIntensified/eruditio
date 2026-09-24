@@ -158,12 +158,13 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
             val all = container.ledger.all()
             val textsWithProgress = texts.count { (progressById.value[it.id] ?: 0) > 0 }
             val readThrough = texts.count { (progressById.value[it.id] ?: 0) >= 100 }
-            val (weekMillis, totalMillis) = container.sessions.readingMinutes()
+            // readingMinutes() returns MINUTES (the seam divides ms itself).
+            val (weekMinutes, totalMinutes) = container.sessions.readingMinutes()
             progressState.value = ProgressState(
                 textsInProgress = textsWithProgress,
                 textsReadThrough = readThrough,
-                minutesReadingWeek = weekMillis / 60_000,
-                minutesReadingTotal = totalMillis / 60_000,
+                minutesReadingWeek = weekMinutes,
+                minutesReadingTotal = totalMinutes,
                 familiar = all.count { container.scheduler.effectiveMastery(it, container.today()) == MasteryLevel.FAMILIAR },
                 proficient = all.count { container.scheduler.effectiveMastery(it, container.today()) == MasteryLevel.PROFICIENT },
                 mastered = all.count { container.scheduler.effectiveMastery(it, container.today()) == MasteryLevel.MASTERED },
