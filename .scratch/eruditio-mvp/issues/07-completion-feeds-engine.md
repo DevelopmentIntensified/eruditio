@@ -4,9 +4,11 @@
 
 **Blocked by:** 02 (Review scheduler and mastery ledger), 06 (Replace opens a real session).
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [ ] Seam test: completing a session changes the due-review set
 - [ ] Review items derive from completed reading segments
 - [ ] Home screen lists today's due reviews and recent sessions
 - [ ] Manual smoke on device: open target app → replace → read → check in → review appears on home
+
+**2026-09-24 — agent**: Seam test "completing a session changes the due-review set" passes; review items derive from completed segments (SegmentConcepts windows); Home lists today's due reviews and recent sessions. Device smoke (open → replace → read → check in → review) pending (human).

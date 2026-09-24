@@ -4,9 +4,11 @@
 
 **Blocked by:** 07 (Completion feeds the engine).
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [ ] Progress screen shows texts read, concepts by mastery level, reviews due — all matching the ledger state
 - [ ] Weekly intercepted count equals recorded continued + replaced outcomes
 - [ ] Streak increments only on days with at least one completed session and resets per its stated rule
 - [ ] Streak and mastery are displayed and stored separately
+
+**2026-09-24 — agent**: Progress screen shows concepts by mastery (effective, decay-aware), reviews due, texts started vs read through (ticket wording), weekly intercepted + replaced. Streak counts only completed-session days (StreakTest: 7 cases); stored separately from the ledger; displayed as "habit, not mastery". Device verification pending (human).

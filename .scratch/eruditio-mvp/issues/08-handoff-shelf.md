@@ -4,8 +4,10 @@
 
 **Blocked by:** 07 (Completion feeds the engine).
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [ ] After any completed session, one relevant next-step link appears
 - [ ] The link opens the correct external destination (Khan course or Exercism track)
 - [ ] No link appears elsewhere in the app; the registry stays a static list
+
+**2026-09-24 — agent**: Static registry (Khan world-history for ancient, Khan grammar for christian, Exercism Kotlin for biography); suggest() null for unknown groups; 4 seam tests pass. Handoff opens via ACTION_VIEW from the activity context (app-context ClassCastException fixed); appears only on the post-session screen. Device check pending (human).

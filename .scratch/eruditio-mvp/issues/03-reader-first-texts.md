@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (Walking skeleton).
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [ ] Library list shows the bundled texts and opens the reader
 - [ ] Reading position restores exactly after app restart
@@ -14,3 +14,5 @@
 ## Comments
 
 **2026-09-24 — user (wireframe direction)**: Variant A (Paper) wins; bottom nav pinned always; percent rings from variant C reused in A; library compact like B. Theme picking added: curated named palettes (Paper/Ink/Sepia/Terminal, Omarchy/nvim-style) on the Progress screen; prototype set captured at branch `prototype/ui-wireframes`.
+
+**2026-09-24 — agent**: Library list, reader, position restore, and check-in all wired; completion recorded through the session seam. Device bug fix: PG assets carry three line-ending vintages (crlf, old \r\r\n, bare \r) so the blank-line split produced one giant paragraph per text and any check-in marked 100% (crito/apology/meditations confirmed by user). TextLibrary now normalizes endings; reader splits into offset-carrying items with an oversized-block line fallback. Remaining human step: verify exact restore + airplane mode on device.

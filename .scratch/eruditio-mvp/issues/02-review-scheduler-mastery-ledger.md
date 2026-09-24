@@ -4,9 +4,11 @@
 
 **Blocked by:** 01 (Walking skeleton).
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [ ] Table-driven tests cover mastery transitions, decay, and challenge selection
 - [ ] Boundary cases pass: empty ledger, missed days, re-mastering after decay
 - [ ] Due set ordering is deterministic
 - [ ] Debug screen displays the due set for a synthetic ledger
+
+**2026-09-24 — agent**: Agent work complete. 13 seam tests pass (mastery table, hard/again/easy, decay, re-master, missed days, deterministic ordering, limits, challenge selection). Debug synthetic-ledger surface now registers only in debug builds (`app/src/debug/AndroidManifest.xml`). Remaining human step: glance at Progress → "Debug: synthetic ledger due set" on device.
