@@ -146,6 +146,17 @@ class SessionControllerTest {
     }
 
     @Test
+    fun `reading minutes are minutes, not raw millis`() = runTest {
+        val controller = makeController().second
+        val opened = controller.startSession("crito", 0L)
+        val sessionId = (opened as SessionStart.Opened).sessionId
+        // ~3 minutes of real reading time lands as millis on the session log.
+        sessionLog.addReadingTime(sessionId, 181_759L)
+        assertEquals(3L, controller.minutesToday())
+        assertEquals(3L to 3L, controller.readingMinutes())
+    }
+
+    @Test
     fun `gate - trial ends, purchase unlocks`() = runTest {
         val (clock, controller) = makeController()
         repeat(TrialGate.FREE_SESSION_LIMIT) {

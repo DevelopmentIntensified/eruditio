@@ -137,10 +137,11 @@ class SessionController(
 
     /** Minutes actually spent reading, this trailing week and all time. */
     suspend fun readingMinutes(): Pair<Long, Long> =
-        sessionLog.readMillisSince((clock.epochDay - 6) * 86_400_000L) to sessionLog.totalReadMillis()
+        sessionLog.readMillisSince((clock.epochDay - 6) * 86_400_000L) / 60_000L to
+            sessionLog.totalReadMillis() / 60_000L
 
     suspend fun minutesToday(): Long =
-        sessionLog.readMillisSince(clock.epochDay * 86_400_000L)
+        sessionLog.readMillisSince(clock.epochDay * 86_400_000L) / 60_000L
 }
 
 /* ----- stores behind the seam (implemented in the data layer, faked in tests) ----- */
