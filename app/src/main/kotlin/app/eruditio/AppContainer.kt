@@ -11,6 +11,7 @@ import app.eruditio.core.TrialGate
 import app.eruditio.data.DeviceClock
 import app.eruditio.data.EruditioDatabase
 import app.eruditio.data.PlayBillingGate
+import app.eruditio.data.ReadingSettings
 import app.eruditio.data.EntitlementRepository
 import app.eruditio.data.RoomInterceptionLog
 import app.eruditio.data.RoomLedgerStore
