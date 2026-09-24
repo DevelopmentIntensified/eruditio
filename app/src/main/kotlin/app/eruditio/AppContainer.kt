@@ -20,6 +20,7 @@ import app.eruditio.data.ReadingPositions
 import app.eruditio.data.SegmentConcepts
 import app.eruditio.data.TextLibrary
 import app.eruditio.data.ThemeStore
+import androidx.compose.runtime.mutableStateOf
 
 /**
  * Composition root. Debug builds bypass the billing gate (billing ticket);
@@ -36,6 +37,14 @@ class AppContainer(private val app: Application) {
     val appContext: Context get() = app
     val hasUsageAccess: Boolean get() = MainActivity.hasUsageAccess(app)
     val canDrawOverlays: Boolean get() = MainActivity.canDrawOverlays(app)
+
+    /**
+     * Set by the reader's checkpoint pause (ticket 14) while the shell activity
+     * is stopped; the shell consumes it on return to land on Home/Today (tab 0)
+     * instead of the tab the user left. Snapshot state so the shell observes it
+     * without polling.
+     */
+    val pauseToHome = mutableStateOf(false)
     fun today(): Long = clock.epochDay
     fun todayStartMillis(): Long = clock.startOfDayMillis()
     fun weekAgoMillis(): Long = System.currentTimeMillis() - 7L * 86_400_000L

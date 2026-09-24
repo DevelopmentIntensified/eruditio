@@ -171,6 +171,13 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
 
     fun titleOfConcept(conceptId: String): String = titleOf(conceptId.substringBefore('#'))
 
+    /** Reader pause path (ticket 14): the shell reads and consumes this to land on Home/Today. */
+    val pauseToHome: Boolean get() = container.pauseToHome.value
+
+    fun consumePauseToHome() {
+        container.pauseToHome.value = false
+    }
+
     fun startReading(textId: String) {
         viewModelScope.launch {
             val startChar = container.positions.restore(textId)?.charOffset ?: 0L
