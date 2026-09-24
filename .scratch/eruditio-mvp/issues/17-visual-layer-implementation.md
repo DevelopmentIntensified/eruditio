@@ -1,17 +1,27 @@
-# 17: Visual layer — all four directions (owner verdict 2026-09-24)
+# 17: Visual layer — prototype first, then implement (owner verdict: all four directions)
 
-**What to build:** Owner picked all four sketched directions for the visual layer:
-(a) checkpoint affordances as the visual signature, (b) per-text reading dials on
-library rows, (c) week strip of session dots on Progress, (d) bundled SVG-style
-plates (map/timeline) for the ancient track. Each is a small, quiet element —
-none may replicate variable-ratio mechanics (standing design-review question).
+**What to build:** Owner picked **all four** sketched directions (2026-09-24), and directed
+**prototyping first**. Phase 1 is a throwaway prototype; Phase 2 (implementation ticket)
+spins out only after the owner's per-element verdicts.
 
-**Blocked by:** (a) 14, (b) 13, (c) none, (d) none — ship after 15 so the reader
-and library are stable.
+**Prototype:** branch `prototype/visual-layer` → `prototype/visual-layer.html`
+(also left untracked in-tree for review). Four questions, variant-switchable
+(floating bar / ← → keys; `?page=…&variant=…` in URL; ✓ button records picks):
 
-**Status:** ready-for-agent
+- **dials** — per-text reading dial on library rows: A quarters dial · B checkpoint dots · C spine fill · D plain ring (today)
+- **week** — session-dot week strip on Progress: A quiet dots · B streak head · C volume bars · D linked path
+- **signature** — checkpoint treatment as the visual signature: A quiet marks · B breathing marks · C instrument column · D diamond marks
+- **plates** — ancient-track plates surfacing: A chapter plate in reader · B library badge gallery · C post-session artifact
 
-- [ ] (a) Checkpoint dots read as the app's visual signature (consistent weight/rythem with the gutter dots; no new noise)
-- [ ] (b) Library rows show a per-text reading dial (ring → dial with position meaning, matching stored progress)
-- [ ] (c) Progress shows a 7-day week strip: one dot per day, filled on days with ≥1 completed session
-- [ ] (d) Ancient track carries a bundled map/timeline plate, viewable offline, rendered without third-party SVG deps
+**Blocked by:** owner verdicts per element (recorded here under Comments).
+
+**Status:** claimed
+
+- [x] Prototype branch exists with all four questions, state surfaced, pick buttons
+- [ ] Owner verdicts recorded per element
+- [ ] Implementation ticket spun out (18-visual-layer-build) with the verdict folded in
+
+## Comments
+
+**2026-09-24 — owner (via implement session)**: "16, prototype them first" — supersedes direct implementation; prototype the four directions before any Compose work.
+**2026-09-24 — agent**: Prototype built and smoke-verified (browser: all pages, all variants, zero console errors; screenshots confirm rendering). Awaiting owner verdicts.
