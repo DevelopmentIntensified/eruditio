@@ -12,3 +12,4 @@
 
 **2026-09-24 — agent**: Static registry (Khan world-history for ancient, Khan grammar for christian, Exercism Kotlin for biography); suggest() null for unknown groups; 4 seam tests pass. Handoff opens via ACTION_VIEW from the activity context (app-context ClassCastException fixed); appears only on the post-session screen. Device check pending (human).
 **2026-09-24 — user/agent**: Owner questioned the external handoff and directed removal from the completed screen ("remove that and let's redo handoffs"); in-app "Read next" (same group, unread first) is the post-session step for now. `HandoffShelf` object + 4 seam tests remain so the redesign can build on them; the card no longer ships in the reader. Re-triaged needs-triage pending the redo.
+**2026-09-24 — owner (via implement session)**: Redo deferred post-MVP. The interim in-app "Read next" step ships as-is; no external handoff work in this branch. Ticket stays needs-triage until a later design pass.
