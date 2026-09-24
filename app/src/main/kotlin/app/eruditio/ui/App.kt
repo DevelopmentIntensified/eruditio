@@ -451,8 +451,11 @@ private fun ReviewScreen(vm: EruditioViewModel, state: EruditioViewModel.ReviewS
         if (card == null) {
             Text("Nothing due. Read a segment from the Library and new cards arrive tomorrow.")
         } else {
+            // Challenge mode gets its own honest caption: learned material
+            // resurfacing, no inflated mastery claim (spec copy discipline).
             Text(
-                "Card ${state.index + 1} of ${state.total}",
+                if (state.isChallenge) "Mastery challenge · learned material resurfacing"
+                else "Card ${state.index + 1} of ${state.total}",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

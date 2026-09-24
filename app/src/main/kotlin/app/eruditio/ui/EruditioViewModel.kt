@@ -47,6 +47,8 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         val cue: String? = null,
         val index: Int = 0,
         val total: Int = 0,
+        /** True when the served cards are the mastery challenge (due set empty). */
+        val isChallenge: Boolean = false,
     )
 
     data class ProgressState(
@@ -140,15 +142,25 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    /** Review-tab serving rule (spec story 14): due cards first; when the due
+     *  set is empty, learned-but-aging material resurfaces as the mastery
+     *  challenge instead of leaving the tab empty. One home for the rule. */
+    private suspend fun servedReviewCards(): Pair<List<LedgerEntry>, Boolean> {
+        val due = container.sessions.dueToday()
+        val cards = due.ifEmpty { container.sessions.masteryChallengeToday() }
+        return cards to (due.isEmpty() && cards.isNotEmpty())
+    }
+
     private fun refreshReview() {
         viewModelScope.launch {
-            val due = container.sessions.dueToday()
-            val head = due.firstOrNull()
+            val (cards, isChallenge) = servedReviewCards()
+            val head = cards.firstOrNull()
             reviewState.value = ReviewState(
                 current = head,
                 cue = head?.let { container.concepts.cueFor(it.conceptId) },
                 index = 0,
-                total = due.size,
+                total = cards.size,
+                isChallenge = isChallenge,
             )
         }
     }
@@ -170,7 +182,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
                 mastered = all.count { container.scheduler.effectiveMastery(it, container.today()) == MasteryLevel.MASTERED },
                 dueCount = container.sessions.dueToday().size,
                 weekly = container.sessions.weeklyInterceptions(),
-                replaced = container.interceptionLog.weeklyReplaced(container.today()),
+                replaced = container.sessions.weeklyReplaced(),
                 streak = container.sessions.currentStreak(),
                 weekDots = container.sessions.weekDots(),
             )
@@ -202,13 +214,14 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             val current = reviewState.value.current ?: return@launch
             container.sessions.gradeConcept(current.conceptId, grade)
-            val due = container.sessions.dueToday()
-            val head = due.firstOrNull()
+            val (cards, isChallenge) = servedReviewCards()
+            val head = cards.firstOrNull()
             reviewState.value = ReviewState(
                 current = head,
                 cue = head?.let { container.concepts.cueFor(it.conceptId) },
                 index = reviewState.value.index + 1,
                 total = reviewState.value.total,
+                isChallenge = isChallenge,
             )
         }
     }
