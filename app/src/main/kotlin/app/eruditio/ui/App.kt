@@ -1,6 +1,9 @@
 package app.eruditio.ui
 
 import android.content.Intent
+import android.content.ActivityNotFoundException
+import android.os.Build
+import android.widget.Toast
 import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,7 +29,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -696,6 +701,41 @@ private fun SettingsScreen(vm: EruditioViewModel, modifier: Modifier) {
                 )
             }
         }
+        // Ticket 22: About card with the in-app bug report composer (variant A).
+        var showBugSheet by remember { mutableStateOf(false) }
+        Card(
+            Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("About", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    Modifier.fillMaxWidth().clickable { showBugSheet = true }.padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Report a bug",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Version", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "Eruditio ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        if (showBugSheet) {
+            BugReportSheet(onDismiss = { showBugSheet = false })
+        }
         if (BuildConfig.DEBUG) {
             TextButton(onClick = { context.startActivity(Intent(context, DebugDueActivity::class.java)) }) {
                 Text("Debug: synthetic ledger due set")
@@ -726,6 +766,80 @@ private fun ThemePicker(vm: EruditioViewModel, current: app.eruditio.ui.theme.Pa
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Ticket 22: the bug report composer (prototype variant A). The user writes in
+ * their own words; Send hands the text plus version lines to the mail client.
+ * Nothing is collected, logged, or sent until that tap.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun BugReportSheet(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var text by rememberSaveable { mutableStateOf("") }
+    val versionLine = "Eruditio ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+    val androidLine = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Report a bug", style = MaterialTheme.typography.titleLarge)
+            TextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = {
+                    Text("What went wrong? Your own words — no logs or screenshots are attached.")
+                },
+                minLines = 5,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "$versionLine · $androidLine",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            ) {
+                OutlinedButton(onClick = onDismiss) {
+                    Text("Discard")
+                }
+                Button(
+                    onClick = {
+                        val report = "${text.trim()}\n\n---\n$versionLine · $androidLine"
+                        val intent =
+                            Intent(Intent.ACTION_SENDTO).apply {
+                                data = "mailto:bugs@eruditio.app".toUri()
+                                putExtra(Intent.EXTRA_SUBJECT, "Eruditio bug report")
+                                putExtra(Intent.EXTRA_TEXT, report)
+                            }
+                        try {
+                            context.startActivity(Intent.createChooser(intent, "Report a bug"))
+                            onDismiss()
+                        } catch (_: ActivityNotFoundException) {
+                            Toast.makeText(
+                                context,
+                                "No mail app found — the report was not sent.",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    },
+                    enabled = text.isNotBlank(),
+                ) {
+                    Text("Send")
+                }
+            }
+            Text(
+                "Nothing is collected, logged, or sent until you tap Send. Send hands this " +
+                    "text to your mail client — your words plus the version lines, nothing else.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
