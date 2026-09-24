@@ -67,7 +67,14 @@ object Palettes {
     fun byId(id: String?): Palette = all.firstOrNull { it.id == id } ?: default
 }
 
-private val notchGold = Color(0xFFC8A24A)
+/**
+ * NotchGold is the app's deliberate checkpoint/notch accent: the single gold
+ * that marks checkpoint dots, plate captions and the "today" streak ring.
+ * It is the visual signature shared across every palette — the one literal
+ * color allowed to escape the Palette data class — and the schemes expose it
+ * via `tertiary`, so composables read it as MaterialTheme.colorScheme.tertiary.
+ */
+val NotchGold = Color(0xFFC8A24A)
 
 private fun schemeOf(palette: Palette): ColorScheme {
     val colors = mapOf(
@@ -92,7 +99,7 @@ private fun schemeOf(palette: Palette): ColorScheme {
             surfaceVariant = colors.getValue("surfaceVariant"),
             onSurfaceVariant = colors.getValue("onSurfaceVariant"),
             outline = colors.getValue("outline"),
-            tertiary = notchGold,
+            tertiary = NotchGold,
         )
     } else {
         lightColorScheme(
@@ -105,7 +112,7 @@ private fun schemeOf(palette: Palette): ColorScheme {
             surfaceVariant = colors.getValue("surfaceVariant"),
             onSurfaceVariant = colors.getValue("onSurfaceVariant"),
             outline = colors.getValue("outline"),
-            tertiary = notchGold,
+            tertiary = NotchGold,
         )
     }
 }
