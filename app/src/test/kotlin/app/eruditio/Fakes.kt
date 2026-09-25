@@ -78,10 +78,15 @@ class FakeSessionLog : SessionLog {
 
     override suspend fun get(sessionId: Long): SessionRecord? = sessions[sessionId]
 
-    override suspend fun complete(sessionId: Long, endChar: Long, atMillis: Long, epochDay: Long) {
-        sessions[sessionId]?.let {
-            sessions[sessionId] = it.copy(endChar = endChar, completedAtMillis = atMillis, completedEpochDay = epochDay)
-        }
+    override suspend fun complete(sessionId: Long, endChar: Long, atMillis: Long, epochDay: Long): Boolean {
+        val session = sessions[sessionId] ?: return false
+        if (session.isCompleted) return false
+        sessions[sessionId] = session.copy(
+            endChar = endChar,
+            completedAtMillis = atMillis,
+            completedEpochDay = epochDay,
+        )
+        return true
     }
 
     override suspend fun recent(limit: Int): List<SessionRecord> =

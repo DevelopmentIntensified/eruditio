@@ -146,6 +146,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
     private suspend fun refreshOnce() {
         val review = reviewSnapshot()
         val savedGleanings = container.gleanings.recent(50)
+        val gleaningCount = container.gleanings.count()
         val progress = container.progressById()
         val recent = container.sessions.recentSessions(5)
         val sessionsThisWeek = container.sessions.weeklySessions()
@@ -199,7 +200,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
             proficient = mastery.proficient,
             mastered = mastery.mastered,
             dueCount = review.dueCount,
-            gleaningCount = savedGleanings.size,
+            gleaningCount = gleaningCount,
             weekly = weekly,
             replaced = replaced,
             streak = streak,

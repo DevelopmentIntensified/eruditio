@@ -111,10 +111,7 @@ class ReaderActivity : androidx.activity.ComponentActivity() {
         if (gleaningSessionId != null) {
             startActivity(GleaningActivity.intent(this, gleaningSessionId))
         } else if (isTaskRoot) {
-            startActivity(
-                Intent(this, MainActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            )
+            returnToEruditioToday(this)
         }
         finish()
     }
@@ -255,6 +252,7 @@ private fun ReadingBody(
     // the cancel survives recomposition — a plain composition var reads the
     // current frame's value and nulls out (Rail pattern below).
     var saveJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var completing by remember { mutableStateOf(false) }
     LaunchedEffect(listState, loaded) {
         saveJob = launch {
             snapshotFlow { listState.firstVisibleItemIndex }
@@ -433,6 +431,9 @@ private fun ReadingBody(
                 // index via the plate offset; saves stay in TEXT-item space.
                 val firstVisible = readerText.textIndexOf(listState.firstVisibleItemIndex)
                 val end = readerText.segmentEndAfter(firstVisible)
+                saveJob?.cancel()
+                onRegisterFlush(null)
+                completing = true
                 scope.launch {
                     val done = container.sessions.completeSession(loaded.sessionId, end)
                     if (done != null) {
@@ -448,9 +449,12 @@ private fun ReadingBody(
                             loaded.group,
                         )
                         onCompleted(CompletedView(loaded.title, done, next))
+                    } else {
+                        completing = false
                     }
                 }
             },
+            enabled = !completing,
             modifier = Modifier.fillMaxWidth().padding(20.dp),
         ) { Text("Check in — I read to here") }
     }
@@ -754,7 +758,7 @@ private fun CompletedBody(container: AppContainer, s: CompletedView) {
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Read next: ${next.title}") }
         }
-        Button(onClick = { (context as? Activity)?.finish() }, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+        Button(onClick = { returnToEruditioToday(context) }, modifier = Modifier.fillMaxWidth()) { Text("Done") }
     }
 }
 

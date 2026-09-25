@@ -57,6 +57,7 @@ class AppContainer(private val app: Application) {
     val interceptionLog = RoomInterceptionLog(db.interceptionDao())
     val scheduler = ReviewScheduler()
     val ledger: LedgerStore = RoomLedgerStore(db.ledgerDao())
+    /** Dormant review-candidate source; completion does not auto-enroll it. */
     val concepts: ConceptSource = SegmentConcepts(library)
     val sessionLog: SessionLog = RoomSessionLog(db.sessionDao())
     val gleanings: GleaningStore = RoomGleaningStore(db.gleaningDao(), clock)

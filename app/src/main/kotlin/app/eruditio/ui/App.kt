@@ -62,10 +62,12 @@ fun App(vm: EruditioViewModel) {
                         onOpenLibrary = { tabIndex = AppTab.LIBRARY.ordinal },
                         onOpenGleanings = { tabIndex = AppTab.GLEANINGS.ordinal },
                         gleanings = gleanings,
+                        gleaningCount = progressState.gleaningCount,
                     )
                     AppTab.LIBRARY -> LibraryScreen(vm, Modifier.fillMaxSize())
                     AppTab.GLEANINGS -> GleaningsScreen(
                         gleanings = gleanings,
+                        totalCount = progressState.gleaningCount,
                         modifier = Modifier.fillMaxSize(),
                         titleOf = vm::titleOf,
                     )

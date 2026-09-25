@@ -1,5 +1,6 @@
 package app.eruditio.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Insert
@@ -42,6 +43,7 @@ data class GleaningEntity(
     val endChar: Long,
     val takeaway: String,
     val sourceContext: String,
+    @ColumnInfo(defaultValue = "") val curatedContext: String,
     val createdAtMillis: Long,
 )
 
@@ -81,6 +83,7 @@ fun GleaningEntity.toGleaning() = Gleaning(
     endChar = endChar,
     takeaway = takeaway,
     sourceContext = sourceContext,
+    curatedContext = curatedContext,
     createdAtMillis = createdAtMillis,
 )
 
@@ -91,6 +94,7 @@ fun GleaningDraft.toEntity(createdAtMillis: Long) = GleaningEntity(
     endChar = endChar,
     takeaway = takeaway,
     sourceContext = sourceContext,
+    curatedContext = curatedContext,
     createdAtMillis = createdAtMillis,
 )
 
@@ -123,7 +127,7 @@ interface SessionDao {
         "UPDATE sessions SET endChar = :endChar, completedAtMillis = :atMillis, completedEpochDay = :epochDay " +
             "WHERE sessionId = :id AND endChar IS NULL",
     )
-    suspend fun complete(id: Long, endChar: Long, atMillis: Long, epochDay: Long)
+    suspend fun complete(id: Long, endChar: Long, atMillis: Long, epochDay: Long): Int
 
     @Query("SELECT DISTINCT completedEpochDay FROM sessions WHERE completedEpochDay IS NOT NULL")
     suspend fun completedEpochDays(): List<Long>
@@ -148,6 +152,9 @@ interface GleaningDao {
 
     @Query("SELECT * FROM gleanings ORDER BY createdAtMillis DESC LIMIT :limit")
     suspend fun recent(limit: Int): List<GleaningEntity>
+
+    @Query("SELECT COUNT(*) FROM gleanings")
+    suspend fun count(): Int
 }
 
 @Dao

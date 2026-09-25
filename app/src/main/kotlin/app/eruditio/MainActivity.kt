@@ -14,7 +14,7 @@ import app.eruditio.ui.App
 import app.eruditio.ui.EruditioViewModel
 
 /**
- * Single-activity app shell: Today / Library / Review / Progress / Settings.
+ * Single-activity app shell: Today / Library / Gleanings / Progress / Settings.
  * Reader is its own quiet activity; the pause overlay lives in intercept/.
  * The Paper editorial direction is now the production shell.
  */

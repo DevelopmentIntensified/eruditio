@@ -19,6 +19,7 @@ import app.eruditio.core.Gleaning
 @Composable
 internal fun GleaningsScreen(
     gleanings: List<Gleaning>,
+    totalCount: Int,
     modifier: Modifier,
     titleOf: (String) -> String,
 ) {
@@ -39,7 +40,7 @@ internal fun GleaningsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            PaperSectionHeader("Your gleanings", detail = "${gleanings.size} total")
+            PaperSectionHeader("Your gleanings", detail = "$totalCount total")
             gleanings.forEach { gleaning ->
                 PaperSurface(Modifier.fillMaxWidth()) {
                     Text(
@@ -49,6 +50,23 @@ internal fun GleaningsScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(gleaning.takeaway, style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.height(12.dp))
+                    Text(
+                        "CURATED LENS",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        gleaning.curatedContext,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "SOURCE ANCHOR · ${gleaning.startChar}–${gleaning.endChar}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         "SOURCE CONTEXT",
                         style = MaterialTheme.typography.labelSmall,

@@ -96,8 +96,8 @@ class SessionController(
      */
     suspend fun completeSession(sessionId: Long, endChar: Long): CompletedSession? {
         val session = sessionLog.get(sessionId) ?: return null
-        if (session.isCompleted) return null
-        sessionLog.complete(sessionId, endChar, clock.epochMillis, clock.epochDay)
+        if (session.isCompleted || endChar <= session.startChar) return null
+        if (!sessionLog.complete(sessionId, endChar, clock.epochMillis, clock.epochDay)) return null
         gate.markSessionCompleted()
         return CompletedSession(sessionId, session.textId)
     }
@@ -217,7 +217,7 @@ interface PositionStore {
 interface SessionLog {
     suspend fun start(textId: String, startChar: Long, epochDay: Long, atMillis: Long): Long
     suspend fun get(sessionId: Long): SessionRecord?
-    suspend fun complete(sessionId: Long, endChar: Long, atMillis: Long, epochDay: Long)
+    suspend fun complete(sessionId: Long, endChar: Long, atMillis: Long, epochDay: Long): Boolean
     suspend fun recent(limit: Int): List<SessionRecord>
     suspend fun completedEpochDays(): Set<Long>
     suspend fun countCompletedSince(fromEpochDay: Long): Int

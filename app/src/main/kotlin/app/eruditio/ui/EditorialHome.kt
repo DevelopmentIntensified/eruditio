@@ -38,6 +38,7 @@ internal fun EditorialHomeScreen(
     onOpenLibrary: () -> Unit,
     onOpenGleanings: () -> Unit,
     gleanings: List<Gleaning>,
+    gleaningCount: Int,
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -119,7 +120,7 @@ internal fun EditorialHomeScreen(
 
         PaperSectionHeader(
             "Gleanings",
-            detail = if (gleanings.isEmpty()) "empty" else "${gleanings.size} kept",
+            detail = if (gleaningCount == 0) "empty" else "$gleaningCount kept",
         )
         PaperSurface(Modifier.fillMaxWidth()) {
             if (gleanings.isEmpty()) {
@@ -130,7 +131,7 @@ internal fun EditorialHomeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                Text("${gleanings.size} ideas kept", style = MaterialTheme.typography.headlineMedium)
+                Text("$gleaningCount ideas kept", style = MaterialTheme.typography.headlineMedium)
                 Text(
                     "Your reading, in your own words.",
                     style = MaterialTheme.typography.bodyMedium,

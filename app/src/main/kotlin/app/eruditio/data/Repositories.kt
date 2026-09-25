@@ -73,8 +73,8 @@ class RoomSessionLog(private val dao: SessionDao) : SessionLog {
 
     override suspend fun readMillisSince(sinceMillis: Long): Long = dao.readMillisSince(sinceMillis)
 
-    override suspend fun complete(sessionId: Long, endChar: Long, atMillis: Long, epochDay: Long) =
-        dao.complete(sessionId, endChar, atMillis, epochDay)
+    override suspend fun complete(sessionId: Long, endChar: Long, atMillis: Long, epochDay: Long): Boolean =
+        dao.complete(sessionId, endChar, atMillis, epochDay) > 0
 }
 
 /**

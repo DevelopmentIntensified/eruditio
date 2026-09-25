@@ -20,7 +20,7 @@ class Converters {
         LedgerEntity::class,
         EntitlementEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -78,9 +78,18 @@ abstract class EruditioDatabase : RoomDatabase() {
             }
         }
 
+        /** v5: retain a bundled editorial lens beside each source snapshot. */
+        private val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE gleanings ADD COLUMN curatedContext TEXT NOT NULL DEFAULT ''",
+                )
+            }
+        }
+
         fun build(context: Application): EruditioDatabase =
             Room.databaseBuilder(context, EruditioDatabase::class.java, "eruditio.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
     }
 }
