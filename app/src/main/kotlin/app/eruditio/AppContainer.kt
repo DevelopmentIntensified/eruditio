@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.Context
 import app.eruditio.core.ConceptSource
 import app.eruditio.core.GleaningContextSource
-import app.eruditio.core.GleaningRecoverySource
 import app.eruditio.core.GleaningStore
 import app.eruditio.core.LedgerStore
 import app.eruditio.core.PositionStore
@@ -19,7 +18,6 @@ import app.eruditio.data.PlayBillingGate
 import app.eruditio.data.ReadingSettings
 import app.eruditio.data.EntitlementRepository
 import app.eruditio.data.GleaningCoordinator
-import app.eruditio.data.RoomGleaningRecovery
 import app.eruditio.data.RoomGleaningStore
 import app.eruditio.data.RoomInterceptionLog
 import app.eruditio.data.RoomLedgerStore
@@ -66,7 +64,6 @@ class AppContainer(private val app: Application) {
     val concepts: ConceptSource = SegmentConcepts(library)
     val sessionLog: SessionLog = RoomSessionLog(db.sessionDao())
     val gleanings: GleaningStore = RoomGleaningStore(db.gleaningDao(), clock)
-    val gleaningRecovery: GleaningRecoverySource = RoomGleaningRecovery(db.gleaningRecoveryDao())
     val gleaningContexts: GleaningContextSource = AssetGleaningContextSource(app)
 
     /** Seam adapter: offset primitive only — Room entities never cross into the core. */

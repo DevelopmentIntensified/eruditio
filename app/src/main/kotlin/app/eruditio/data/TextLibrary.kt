@@ -1,6 +1,7 @@
 package app.eruditio.data
 
 import android.content.Context
+import app.eruditio.core.SourceTextReader
 import org.json.JSONArray
 
 /** One bundled classic (assets/texts/<file>); carries its content group for handoff. */
@@ -12,13 +13,13 @@ data class TextMeta(
     val group: String,
 )
 
-class TextLibrary(private val context: Context) {
+class TextLibrary(private val context: Context) : SourceTextReader {
 
     val texts: List<TextMeta> by lazy { loadIndex() }
 
     fun meta(textId: String): TextMeta? = texts.firstOrNull { it.id == textId }
 
-    fun text(textId: String): String {
+    override fun text(textId: String): String {
         val file = requireMeta(textId).file
         // PG plain text comes in three line-ending vintages (\r\n, old \r\r\n,
         // rare bare \r); normalize all so splitting and offset arithmetic see

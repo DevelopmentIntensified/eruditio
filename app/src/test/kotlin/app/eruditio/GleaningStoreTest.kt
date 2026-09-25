@@ -4,7 +4,6 @@ import app.eruditio.core.GleaningDraft
 import app.eruditio.core.PendingGleaningDraft
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,7 +12,6 @@ import org.junit.Test
 class GleaningStoreTest {
 
     private val store = FakeGleaningStore()
-    private val recovery = FakeGleaningRecovery(store)
 
     private fun pending(sessionId: Long = 1L) = PendingGleaningDraft(
         sessionId = sessionId,
@@ -66,28 +64,19 @@ class GleaningStoreTest {
         assertNull(store.pending(1L))
         assertNull(store.latestPending())
         assertTrue(store.all().isEmpty())
-        // The tombstone is what makes it terminal: the recovery scan, which is
-        // how Today re-offers an unresolved completion, must skip it.
+        // The tombstone is what makes it terminal: the row still exists, so
+        // Today will never re-offer a session the reader threw away.
         assertTrue(store.isHandled(1L))
-        assertNull("a discarded session must not be recoverable", recovery.firstUnhandled())
     }
 
     @Test
-    fun `a completed session with no row is recoverable`() = runTest {
-        store.complete(7L)
-        store.complete(8L)
+    fun `a discarded row is hidden from the collection but not deleted`() = runTest {
+        store.prepare(pending())
+        store.discard(1L)
 
-        assertEquals(7L, recovery.firstUnhandled()?.sessionId)
-    }
-
-    @Test
-    fun `recovering a session then discarding it clears the queue`() = runTest {
-        store.complete(7L)
-        val recovered = recovery.firstUnhandled()!!
-        store.prepare(pending(recovered.sessionId))
-        store.discard(recovered.sessionId)
-
-        assertNull(recovery.firstUnhandled())
+        assertTrue(store.all().isEmpty())
+        assertEquals(0, store.count())
+        assertTrue(store.isHandled(1L))
     }
 
     @Test
@@ -101,13 +90,20 @@ class GleaningStoreTest {
     }
 
     @Test
-    fun `saving a recovered session twice keeps one row`() = runTest {
+    fun `saving a session twice keeps one row`() = runTest {
         store.prepare(pending(sessionId = 3L))
         store.save(saved(sessionId = 3L, takeaway = "first"))
         store.save(saved(sessionId = 3L, takeaway = "second"))
 
         assertEquals(1, store.count())
         assertEquals("second", store.all().single().takeaway)
-        assertFalse(store.isHandled(99L))
+    }
+
+    @Test
+    fun `an unhandled session is not offered on the home surface`() = runTest {
+        // A completed session with no row is pre-feature history, not an
+        // interrupted hand-off; Today must stay quiet about it.
+        store.complete(7L)
+        assertNull(store.latestPending())
     }
 }

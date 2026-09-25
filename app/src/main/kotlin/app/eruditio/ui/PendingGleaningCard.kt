@@ -12,21 +12,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * The durable hand-off surface: a completed session that never reached Keep
- * (process death, crash, or a discardable resume) reappears here until the
- * reader finishes or explicitly discards it.
+ * The durable hand-off surface: a completed session whose reflection has not
+ * reached Keep yet — the reader died, crashed, or backed out — reappears here
+ * until they finish it or explicitly discard it.
  */
 @Composable
 internal fun PendingGleaningCard(
     context: Context,
     sessionId: Long,
-    isRecovery: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    PaperSectionHeader("Waiting for you", detail = if (isRecovery) "recover" else "one gleaning")
+    PaperSectionHeader("Waiting for you", detail = "one gleaning")
     PaperSurface(modifier.fillMaxWidth()) {
         Text(
-            if (isRecovery) "A completed reading is ready for reflection." else "A reading is ready for your reflection.",
+            "A reading is ready for your reflection.",
             style = MaterialTheme.typography.titleMedium,
         )
         Spacer(Modifier.height(6.dp))

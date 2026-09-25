@@ -28,7 +28,6 @@ abstract class EruditioDatabase : RoomDatabase() {
     abstract fun readingPositionDao(): ReadingPositionDao
     abstract fun sessionDao(): SessionDao
     abstract fun gleaningDao(): GleaningDao
-    abstract fun gleaningRecoveryDao(): GleaningRecoveryDao
     abstract fun interceptionDao(): InterceptionDao
     abstract fun ledgerDao(): LedgerDao
     abstract fun entitlementDao(): EntitlementDao

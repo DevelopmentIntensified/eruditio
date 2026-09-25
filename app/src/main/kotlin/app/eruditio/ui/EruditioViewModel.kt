@@ -8,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import app.eruditio.AppContainer
 import app.eruditio.core.Entitlement
 import app.eruditio.core.Gleaning
-import app.eruditio.core.GleaningRecovery
 import app.eruditio.core.LedgerEntry
 import app.eruditio.core.MasteryLevel
 import app.eruditio.core.PendingGleaning
@@ -101,7 +100,6 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         // Only surface a hand-off whose session actually completed; a row left by
         // a crash between hand-off and completion must not nag on Today.
         val pendingIsComplete = pendingGleaning?.let { container.sessions.sessionFor(it.sessionId)?.isCompleted == true }
-        val recoverableGleaning = container.gleaningRecovery.firstUnhandled()
         val gleaningCount = container.gleanings.count()
         val progress = container.progressById()
         val recent = container.sessions.recentSessions(5)
@@ -140,7 +138,6 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
             reviewItems = reviewItems,
             reviewIsChallenge = review.isChallenge,
             pendingGleaning = pendingGleaning?.takeIf { pendingIsComplete == true },
-            recoverableGleaning = recoverableGleaning,
         )
         reviewState.value = ReviewState(
             current = head,

@@ -70,11 +70,12 @@ data class GleaningRecovery(
 enum class GleaningHandoff { PREPARED, ALREADY_HANDLED, UNAVAILABLE }
 
 /**
- * Finds a completed session the reader has not yet resolved. Implemented as one
- * join so recovery is neither bounded by a page size nor an N+1 scan.
+ * Reads bundled source text by id. A port rather than the Android-bound
+ * `TextLibrary`, so the hand-off coordinator is faked at the core boundary
+ * (ADR-0002) instead of dragging an asset loader into the test surface.
  */
-interface GleaningRecoverySource {
-    suspend fun firstUnhandled(): GleaningRecovery?
+fun interface SourceTextReader {
+    fun text(textId: String): String
 }
 
 data class PendingGleaning(

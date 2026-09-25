@@ -1,6 +1,5 @@
 package app.eruditio.ui
 
-import app.eruditio.core.GleaningRecovery
 import app.eruditio.core.LedgerEntry
 import app.eruditio.core.MasteryLevel
 import app.eruditio.core.PendingGleaning
@@ -30,8 +29,6 @@ data class HomeState(
     val reviewIsChallenge: Boolean = false,
     /** A hand-off row whose session completed and is still awaiting Keep. */
     val pendingGleaning: PendingGleaning? = null,
-    /** A completed session with no row at all — the crash-window case. */
-    val recoverableGleaning: GleaningRecovery? = null,
 )
 
 data class ReviewState(

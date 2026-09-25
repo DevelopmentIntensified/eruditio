@@ -118,12 +118,10 @@ internal fun EditorialHomeScreen(
             }
         }
 
-        val waitingSessionId = state.pendingGleaning?.sessionId ?: state.recoverableGleaning?.sessionId
-        if (waitingSessionId != null) {
+        state.pendingGleaning?.let { pending ->
             PendingGleaningCard(
                 context = context,
-                sessionId = waitingSessionId,
-                isRecovery = state.pendingGleaning == null,
+                sessionId = pending.sessionId,
             )
         }
 
