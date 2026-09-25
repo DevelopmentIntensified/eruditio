@@ -31,8 +31,12 @@ _Avoid_: Substitute, swap
 **Session**:
 One short reading engagement in a bundled text, spanning from a resume position to a completion point.
 
+**Gleaning**:
+The learning output from a session: the reader's own takeaway paired with curated context, both tied to the source passage.
+_Avoid_: Review item, bare summary, bare highlight
+
 **Segment**:
-A fixed-length reading window of a text; sessions complete within segments, and review items derive from completed segment ranges.
+A fixed-length reading window of a text; sessions complete within segments, and gleanings derive from completed segment ranges. Review items require curated memorizable content.
 _Avoid_: Chapter, section
 
 **Checkpoint**:
@@ -58,8 +62,8 @@ _Avoid_: Category, track, genre
 ### Review
 
 **Review item**:
-A segment-derived recall cue on the spaced-repetition ledger, shown as a card to grade.
-_Avoid_: Flashcard, question, concept card
+A deliberately memorizable idea drawn from curated content and placed on the spaced-repetition ledger. Passive reading segments are not review items.
+_Avoid_: Arbitrary passage excerpt, bare cue, self-grade-only card
 
 **Mastery**:
 The three-level progress of a review item: familiar → proficient → mastered.
