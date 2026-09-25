@@ -43,6 +43,7 @@ data class GleaningEntity(
     val textId: String,
     val startChar: Long,
     val endChar: Long,
+    /** Empty marks a durable pending hand-off; saved gleanings require a takeaway. */
     val takeaway: String,
     val sourceContext: String,
     @ColumnInfo(defaultValue = "") val curatedContext: String,
