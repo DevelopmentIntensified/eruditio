@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.eruditio.AppContainer
 import app.eruditio.core.Entitlement
 import app.eruditio.core.Gleaning
+import app.eruditio.core.GleaningRecovery
 import app.eruditio.core.LedgerEntry
 import app.eruditio.core.MasteryLevel
 import app.eruditio.core.PendingGleaning
@@ -56,6 +57,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         val reviewItems: List<HomeReviewItem> = emptyList(),
         val reviewIsChallenge: Boolean = false,
         val pendingGleaning: PendingGleaning? = null,
+        val recoverableGleaning: GleaningRecovery? = null,
     )
 
     private data class ReviewSnapshot(
@@ -149,6 +151,16 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         val review = reviewSnapshot()
         val savedGleanings = container.gleanings.all()
         val pendingGleaning = container.gleanings.latestPending()
+        val recoverableSession = container.sessions.recentSessions(20)
+            .firstOrNull { it.isCompleted && !container.gleanings.contains(it.sessionId) }
+        val recoverableGleaning = recoverableSession?.endChar?.let { end ->
+            GleaningRecovery(
+                sessionId = recoverableSession.sessionId,
+                textId = recoverableSession.textId,
+                startChar = recoverableSession.startChar,
+                endChar = end,
+            )
+        }
         val gleaningCount = container.gleanings.count()
         val progress = container.progressById()
         val recent = container.sessions.recentSessions(5)
@@ -187,6 +199,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
             reviewItems = reviewItems,
             reviewIsChallenge = review.isChallenge,
             pendingGleaning = pendingGleaning,
+            recoverableGleaning = recoverableGleaning,
         )
         reviewState.value = ReviewState(
             current = head,

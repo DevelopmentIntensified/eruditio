@@ -44,7 +44,7 @@ class GleaningDraftTest {
         )
 
         assertEquals(2L, excerpt?.startChar)
-        assertEquals("first\n second   third  ", excerpt?.text)
+        assertEquals("first\n second   third", excerpt?.text)
     }
 
     @Test
@@ -57,19 +57,24 @@ class GleaningDraftTest {
             text = "  first thought  ",
         )
 
-        assertEquals("  first thought  ", pending?.sourceContext)
+        assertEquals("first thought", pending?.sourceContext)
         assertEquals(null, pending?.curatedContext)
     }
 
     @Test
-    fun `curated lenses are optional and passage-specific`() {
-        assertEquals(
-            "Euthyphro’s answer sounds exact, but it hides a circle: the action is called pious because the gods approve it, while approval is inferred from the action’s piety.",
-            app.eruditio.core.GleaningLens.forSource(
-                "euthyphro",
-                "Piety, then, is that which is dear to the gods",
-            ),
+    fun `curated context is supplied by an offline source, never fabricated`() {
+        val contexts = app.eruditio.core.GleaningContextSource { textId, source ->
+            if (textId == "euthyphro" && source.contains("Piety")) "A local lens" else null
+        }
+        val material = app.eruditio.core.GleaningDraftFactory.source(
+            textId = "euthyphro",
+            startChar = 0L,
+            endChar = 5L,
+            text = "Piety",
+            curatedContext = contexts.forSource("euthyphro", "Piety"),
         )
-        assertEquals(null, app.eruditio.core.GleaningLens.forSource("apology", "A passage"))
+        assertEquals("Piety", material?.sourceContext)
+        assertEquals("A local lens", material?.curatedContext)
+        assertEquals(null, contexts.forSource("apology", "A passage"))
     }
 }

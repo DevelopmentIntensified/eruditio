@@ -3,6 +3,7 @@ package app.eruditio
 import android.app.Application
 import android.content.Context
 import app.eruditio.core.ConceptSource
+import app.eruditio.core.GleaningContextSource
 import app.eruditio.core.GleaningStore
 import app.eruditio.core.LedgerStore
 import app.eruditio.core.PositionStore
@@ -10,11 +11,13 @@ import app.eruditio.core.ReviewScheduler
 import app.eruditio.core.SessionController
 import app.eruditio.core.SessionLog
 import app.eruditio.core.TrialGate
+import app.eruditio.data.AssetGleaningContextSource
 import app.eruditio.data.DeviceClock
 import app.eruditio.data.EruditioDatabase
 import app.eruditio.data.PlayBillingGate
 import app.eruditio.data.ReadingSettings
 import app.eruditio.data.EntitlementRepository
+import app.eruditio.data.GleaningCoordinator
 import app.eruditio.data.RoomGleaningStore
 import app.eruditio.data.RoomInterceptionLog
 import app.eruditio.data.RoomLedgerStore
@@ -61,6 +64,7 @@ class AppContainer(private val app: Application) {
     val concepts: ConceptSource = SegmentConcepts(library)
     val sessionLog: SessionLog = RoomSessionLog(db.sessionDao())
     val gleanings: GleaningStore = RoomGleaningStore(db.gleaningDao(), clock)
+    val gleaningContexts: GleaningContextSource = AssetGleaningContextSource(app)
 
     /** Seam adapter: offset primitive only — Room entities never cross into the core. */
     val positionStore: PositionStore = object : PositionStore {
@@ -79,6 +83,8 @@ class AppContainer(private val app: Application) {
         gate = trial,
         clock = clock,
     )
+
+    val gleaningCoordinator = GleaningCoordinator(sessions, library, gleanings, gleaningContexts)
 
     private val textLengths = mutableMapOf<String, Int>()
 

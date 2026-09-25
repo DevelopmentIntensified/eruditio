@@ -5,8 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.eruditio.AppContainer
 import app.eruditio.core.GleaningDraft
-import app.eruditio.core.GleaningLens
-import app.eruditio.core.GleaningSourceBuilder
+import app.eruditio.core.GleaningDraftFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +35,7 @@ internal data class GleaningUiState(
     val saving: Boolean = false,
     val saveError: String? = null,
     val showExitDialog: Boolean = false,
+    val discarded: Boolean = false,
 )
 
 /** Owns the Gleaning flow state and persistence; the Compose screen only renders it. */
@@ -133,12 +133,15 @@ internal class GleaningViewModel(
         }
     }
 
-    fun discard(onComplete: () -> Unit) {
+    fun discard() {
         viewModelScope.launch {
             try {
                 container.gleanings.discard(sessionId)
-            } finally {
-                onComplete()
+                updateState { it.copy(discarded = true) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                updateState { it.copy(saveError = "Could not discard this reflection.") }
             }
         }
     }
@@ -151,6 +154,7 @@ internal class GleaningViewModel(
                 saved = false,
                 saveError = null,
                 showExitDialog = false,
+                discarded = false,
             )
         }
     }
@@ -202,6 +206,7 @@ internal class GleaningViewModel(
             updateState { it.copy(loadError = "This session has no readable source context.") }
             return
         }
+        container.gleaningCoordinator.preparePending(sessionId, end)
         updateState { it.copy(source = source) }
     }
 
@@ -211,17 +216,17 @@ internal class GleaningViewModel(
         endChar: Long,
         text: String,
     ): GleaningSource? {
-        val excerpt = GleaningSourceBuilder.build(text, startChar, endChar) ?: return null
+        val source = GleaningDraftFactory.source(textId, startChar, endChar, text) ?: return null
         val meta = container.library.meta(textId)
         return GleaningSource(
             sessionId = sessionId,
             textId = textId,
             title = meta?.title ?: textId,
             author = meta?.author.orEmpty(),
-            startChar = excerpt.startChar,
-            endChar = excerpt.endChar,
-            sourceContext = excerpt.text,
-            curatedContext = GleaningLens.forSource(textId, excerpt.text),
+            startChar = source.startChar,
+            endChar = source.endChar,
+            sourceContext = source.sourceContext,
+            curatedContext = container.gleaningContexts.forSource(textId, source.sourceContext),
         )
     }
 

@@ -8,6 +8,11 @@ import app.eruditio.core.InterceptionResult
 import app.eruditio.core.LedgerEntry
 import app.eruditio.core.LedgerStore
 import app.eruditio.core.ConceptSource
+import app.eruditio.core.Gleaning
+import app.eruditio.core.GleaningDraft
+import app.eruditio.core.GleaningStore
+import app.eruditio.core.PendingGleaning
+import app.eruditio.core.PendingGleaningDraft
 import app.eruditio.core.PositionStore
 import app.eruditio.core.SessionLog
 import app.eruditio.core.SessionRecord
@@ -127,4 +132,67 @@ class FakePositionStore(
 ) : PositionStore {
     override suspend fun restoreOffset(textId: String): Long? = offsets[textId]
     override suspend fun lastReadTextId(): String? = lastTextId
+}
+
+/**
+ * Mirrors the Room adapter's explicit pending/saved/discarded contract so the
+ * store interface and the recovery flow can be tested without Android.
+ */
+class FakeGleaningStore : GleaningStore {
+    private enum class Status { PENDING, SAVED, DISCARDED }
+
+    private data class Row(val saved: Gleaning?, val pending: PendingGleaning?, val status: Status)
+
+    private val rows = mutableMapOf<Long, Row>()
+    private var clock = 1_000L
+
+    fun advanceClock(by: Long) { clock += by }
+
+    override suspend fun prepare(draft: PendingGleaningDraft): PendingGleaning {
+        val pending = PendingGleaning(
+            sessionId = draft.sessionId,
+            textId = draft.textId,
+            startChar = draft.startChar,
+            endChar = draft.endChar,
+            sourceContext = draft.sourceContext,
+            curatedContext = draft.curatedContext,
+            createdAtMillis = clock++,
+        )
+        rows[draft.sessionId] = Row(null, pending, Status.PENDING)
+        return pending
+    }
+
+    override suspend fun pending(sessionId: Long): PendingGleaning? =
+        rows[sessionId]?.takeIf { it.status == Status.PENDING }?.pending
+
+    override suspend fun latestPending(): PendingGleaning? =
+        rows.values.filter { it.status == Status.PENDING }.maxByOrNull { it.pending!!.createdAtMillis }?.pending
+
+    override suspend fun discard(sessionId: Long) {
+        val row = rows[sessionId] ?: return
+        if (row.status == Status.PENDING) rows[sessionId] = row.copy(status = Status.DISCARDED)
+    }
+
+    override suspend fun contains(sessionId: Long): Boolean =
+        rows[sessionId]?.status != Status.DISCARDED && rows.containsKey(sessionId)
+
+    override suspend fun save(draft: GleaningDraft): Gleaning {
+        val saved = Gleaning(
+            sessionId = draft.sessionId,
+            textId = draft.textId,
+            startChar = draft.startChar,
+            endChar = draft.endChar,
+            takeaway = draft.takeaway,
+            sourceContext = draft.sourceContext,
+            curatedContext = draft.curatedContext,
+            createdAtMillis = clock++,
+        )
+        rows[draft.sessionId] = Row(saved, null, Status.SAVED)
+        return saved
+    }
+
+    override suspend fun all(): List<Gleaning> =
+        rows.values.filter { it.status == Status.SAVED }.map { it.saved!! }
+
+    override suspend fun count(): Int = rows.values.count { it.status == Status.SAVED }
 }

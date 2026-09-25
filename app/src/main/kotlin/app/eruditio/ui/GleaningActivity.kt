@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -58,7 +59,7 @@ class GleaningActivity : ComponentActivity() {
                     onStepBack = vm::stepBack,
                     onRequestExit = vm::requestExit,
                     onKeepEditing = vm::keepEditing,
-                    onDiscard = { vm.discard(::returnToToday) },
+                    onDiscard = vm::discard,
                     onFinished = ::returnToToday,
                 )
             }
@@ -95,12 +96,17 @@ private fun GleaningFlow(
 ) {
     val source = state.source
 
+    LaunchedEffect(state.discarded) {
+        if (state.discarded) onFinished()
+    }
+
     BackHandler {
         when {
             state.saved -> onFinished()
             state.saving -> Unit
             state.step != GleaningStep.NOTICE -> onStepBack()
             state.takeaway.isNotBlank() -> onRequestExit()
+            state.loadError != null -> onFinished()
             else -> onDiscard()
         }
     }
@@ -121,7 +127,7 @@ private fun GleaningFlow(
 
     when {
         source == null && state.loadError == null -> LoadingBody()
-        source == null -> MessageBody("Gleaning unavailable", state.loadError.orEmpty(), onDiscard)
+        source == null -> MessageBody("Gleaning unavailable", state.loadError.orEmpty(), onFinished)
         else -> NoticeCompareKeep(
             state = state,
             source = source,

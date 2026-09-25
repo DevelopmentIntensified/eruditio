@@ -43,7 +43,8 @@ data class GleaningEntity(
     val textId: String,
     val startChar: Long,
     val endChar: Long,
-    /** Empty marks a durable pending hand-off; saved gleanings require a takeaway. */
+    @ColumnInfo(defaultValue = "saved") val status: String = "saved",
+    /** Empty is allowed only while a durable hand-off is pending. */
     val takeaway: String,
     val sourceContext: String,
     @ColumnInfo(defaultValue = "") val curatedContext: String,
@@ -105,6 +106,7 @@ fun GleaningDraft.toEntity(createdAtMillis: Long) = GleaningEntity(
     textId = textId,
     startChar = startChar,
     endChar = endChar,
+    status = "saved",
     takeaway = takeaway,
     sourceContext = sourceContext,
     curatedContext = curatedContext.orEmpty(),
@@ -116,6 +118,7 @@ fun PendingGleaningDraft.toEntity(createdAtMillis: Long) = GleaningEntity(
     textId = textId,
     startChar = startChar,
     endChar = endChar,
+    status = "pending",
     takeaway = "",
     sourceContext = sourceContext,
     curatedContext = curatedContext.orEmpty(),
@@ -174,19 +177,22 @@ interface GleaningDao {
     @Upsert
     suspend fun upsert(gleaning: GleaningEntity)
 
-    @Query("SELECT * FROM gleanings WHERE takeaway != '' ORDER BY createdAtMillis DESC")
+    @Query("SELECT * FROM gleanings WHERE status = 'saved' ORDER BY createdAtMillis DESC")
     suspend fun all(): List<GleaningEntity>
 
-    @Query("SELECT COUNT(*) FROM gleanings WHERE takeaway != ''")
+    @Query("SELECT COUNT(*) FROM gleanings WHERE status = 'saved'")
     suspend fun count(): Int
 
-    @Query("SELECT * FROM gleanings WHERE sessionId = :sessionId AND takeaway = ''")
+    @Query("SELECT * FROM gleanings WHERE sessionId = :sessionId AND status = 'pending'")
     suspend fun pending(sessionId: Long): GleaningEntity?
 
-    @Query("SELECT * FROM gleanings WHERE takeaway = '' ORDER BY createdAtMillis DESC LIMIT 1")
+    @Query("SELECT * FROM gleanings WHERE status = 'pending' ORDER BY createdAtMillis DESC LIMIT 1")
     suspend fun latestPending(): GleaningEntity?
 
-    @Query("DELETE FROM gleanings WHERE sessionId = :sessionId AND takeaway = ''")
+    @Query("SELECT EXISTS(SELECT 1 FROM gleanings WHERE sessionId = :sessionId AND status != 'discarded')")
+    suspend fun contains(sessionId: Long): Boolean
+
+    @Query("UPDATE gleanings SET status = 'discarded' WHERE sessionId = :sessionId AND status = 'pending'")
     suspend fun discard(sessionId: Long)
 }
 

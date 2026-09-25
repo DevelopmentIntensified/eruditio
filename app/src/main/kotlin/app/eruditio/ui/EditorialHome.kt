@@ -118,10 +118,15 @@ internal fun EditorialHomeScreen(
             }
         }
 
-        state.pendingGleaning?.let { pending ->
-            PaperSectionHeader("Waiting for you", detail = "one gleaning")
+        val waitingSessionId = state.pendingGleaning?.sessionId ?: state.recoverableGleaning?.sessionId
+        if (waitingSessionId != null) {
+            val isRecovery = state.pendingGleaning == null
+            PaperSectionHeader("Waiting for you", detail = if (isRecovery) "recover" else "one gleaning")
             PaperSurface(Modifier.fillMaxWidth()) {
-                Text("A reading is ready for your reflection.", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    if (isRecovery) "A completed reading is ready for reflection." else "A reading is ready for your reflection.",
+                    style = MaterialTheme.typography.titleMedium,
+                )
                 Spacer(Modifier.height(6.dp))
                 Text(
                     "Pick up where you left off and keep one idea worth carrying.",
@@ -130,7 +135,7 @@ internal fun EditorialHomeScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Button(
-                    onClick = { context.startActivity(GleaningActivity.intent(context, pending.sessionId)) },
+                    onClick = { context.startActivity(GleaningActivity.intent(context, waitingSessionId)) },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Continue gleaning →") }
             }

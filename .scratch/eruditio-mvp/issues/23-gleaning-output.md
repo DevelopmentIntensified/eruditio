@@ -13,7 +13,7 @@
 - [x] Add the reflection step to meaningful completion
 - [x] Add a browsable Gleanings surface
 - [x] Demote or hide arbitrary segment Review items until memorizable content exists
-- [ ] Verify offline, private, no-data-egress behavior
+- [ ] Verify offline, private, no-data-egress behavior — static + unit verified; on-device airplane-mode smoke outstanding (no ADB device attached)
 
 ## Done
 
@@ -24,4 +24,5 @@
 
 - **2026-09-25 — agent**: Current Review shows passive passage excerpts and self-grade buttons. Owner clarified the product goal is gleaning value from books, not memorizing them. Prototype: `prototype/gleaning.html?variant=A|B|C`.
 - **2026-09-25 — owner**: **C — three movements**. Implement Notice → Compare → Keep; no grade or memorization mechanic.
-- **2026-09-25 — implementation**: Added local Room-backed Gleanings (schema v5), durable pending hand-off/recovery, exact source anchors, optional passage-specific bundled lens, Notice → Compare → Keep persistence, ViewModel-owned saved drafts, full local browsing, safe exits, and no automatic passive-segment review enrollment. 78 unit/seam tests and debug build pass. Real-device migration/flow smoke remains pending because no ADB device is currently connected.
+- **2026-09-25 — implementation**: Added local Room-backed Gleanings (schema v6), explicit pending/saved/discarded status, durable hand-off plus a Home recovery scan for process death, exact source anchors, an offline curated catalog (`assets/gleaning_context.json`) with no fabricated fallbacks, Notice → Compare → Keep persistence, ViewModel-owned saved drafts, full local browsing, safe exits, and no automatic passive-segment review enrollment. Store contract, catalog-anchor integrity, and draft/lens behavior are unit-tested; debug build passes.
+- **2026-09-25 — verification**: Gleaning path (8 files) contains no network, HTTP, socket, or logging calls; all persistence is Room, all curated content is a bundled asset. Real-device migration and airplane-mode smoke still pending because no ADB device is connected.

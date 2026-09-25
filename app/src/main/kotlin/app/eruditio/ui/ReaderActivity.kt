@@ -297,16 +297,11 @@ private fun ReadingBody(
         val end = readerText.segmentEndAfter(checkpoint)
         scope.launch {
             container.positions.save(loaded.textId, items[checkpoint].startChar)
-            val pendingReady = preparePendingGleaning(container, loaded.sessionId, end)
-            if (!pendingReady) {
-                container.pauseToHome.value = true
-                onLeave(null)
-                return@launch
-            }
             val completed = container.sessions.completeSession(loaded.sessionId, end)
             if (completed == null) {
-                container.gleanings.discard(loaded.sessionId)
                 container.pauseToHome.value = true
+            } else {
+                container.gleaningCoordinator.preparePending(completed.sessionId, end)
             }
             // A checkpoint is a meaningful completion too: offer the same
             // Notice → Compare → Keep flow before returning to the shell.
@@ -439,19 +434,13 @@ private fun ReadingBody(
                 onRegisterFlush(null)
                 completing = true
                 scope.launch {
-                    val pendingReady = preparePendingGleaning(container, loaded.sessionId, end)
-                    if (!pendingReady) {
-                        completing = false
-                        onRegisterFlush { saveTopLine() }
-                        return@launch
-                    }
                     val done = container.sessions.completeSession(loaded.sessionId, end)
                     if (done != null) {
                         val resumeStart = readerText.items[firstVisible].startChar
                         container.positions.save(loaded.textId, resumeStart)
+                        container.gleaningCoordinator.preparePending(done.sessionId, end)
                         onCompleted(done)
                     } else {
-                        container.gleanings.discard(loaded.sessionId)
                         completing = false
                         onRegisterFlush { saveTopLine() }
                     }

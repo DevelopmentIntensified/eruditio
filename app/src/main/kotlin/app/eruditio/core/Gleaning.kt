@@ -55,6 +55,13 @@ class PendingGleaningDraft(
     }
 }
 
+data class GleaningRecovery(
+    val sessionId: Long,
+    val textId: String,
+    val startChar: Long,
+    val endChar: Long,
+)
+
 data class PendingGleaning(
     val sessionId: Long,
     val textId: String,
@@ -65,17 +72,8 @@ data class PendingGleaning(
     val createdAtMillis: Long,
 )
 
-/** Small, local content lenses; absence is valid and never gets fabricated. */
-object GleaningLens {
-    fun forSource(textId: String, sourceContext: String): String? =
-        if (
-            textId == "euthyphro" &&
-            sourceContext.contains("Piety, then, is that which is dear to the gods")
-        ) {
-            "Euthyphro’s answer sounds exact, but it hides a circle: the action is called pious because the gods approve it, while approval is inferred from the action’s piety."
-        } else {
-            null
-        }
+fun interface GleaningContextSource {
+    fun forSource(textId: String, sourceContext: String): String?
 }
 
 data class SourceExcerpt(
@@ -95,30 +93,55 @@ object GleaningSourceBuilder {
         if (textLength == 0L || requestedStart < 0L || requestedEnd > textLength || requestedEnd <= requestedStart) {
             return null
         }
-        val start = requestedStart.toInt()
-        val end = requestedEnd.toInt()
-        val excerpt = text.substring(start, end)
-        if (excerpt.isBlank()) return null
-        return SourceExcerpt(start.toLong(), end.toLong(), excerpt)
+        var start = requestedStart.toInt()
+        var end = requestedEnd.toInt()
+        while (start < end && text[start].isWhitespace()) start++
+        while (end > start && text[end - 1].isWhitespace()) end--
+        if (start >= end) return null
+        return SourceExcerpt(start.toLong(), end.toLong(), text.substring(start, end))
     }
 }
 
+data class GleaningSourceMaterial(
+    val startChar: Long,
+    val endChar: Long,
+    val sourceContext: String,
+    val curatedContext: String?,
+)
+
 object GleaningDraftFactory {
+    fun source(
+        textId: String,
+        startChar: Long,
+        endChar: Long,
+        text: String,
+        curatedContext: String? = null,
+    ): GleaningSourceMaterial? {
+        val excerpt = GleaningSourceBuilder.build(text, startChar, endChar) ?: return null
+        return GleaningSourceMaterial(
+            startChar = excerpt.startChar,
+            endChar = excerpt.endChar,
+            sourceContext = excerpt.text,
+            curatedContext = curatedContext,
+        )
+    }
+
     fun pending(
         sessionId: Long,
         textId: String,
         startChar: Long,
         endChar: Long,
         text: String,
+        curatedContext: String? = null,
     ): PendingGleaningDraft? {
-        val excerpt = GleaningSourceBuilder.build(text, startChar, endChar) ?: return null
+        val source = source(textId, startChar, endChar, text, curatedContext) ?: return null
         return PendingGleaningDraft(
             sessionId = sessionId,
             textId = textId,
-            startChar = excerpt.startChar,
-            endChar = excerpt.endChar,
-            sourceContext = excerpt.text,
-            curatedContext = GleaningLens.forSource(textId, excerpt.text),
+            startChar = source.startChar,
+            endChar = source.endChar,
+            sourceContext = source.sourceContext,
+            curatedContext = source.curatedContext,
         )
     }
 }
@@ -129,6 +152,7 @@ interface GleaningStore {
     suspend fun pending(sessionId: Long): PendingGleaning?
     suspend fun latestPending(): PendingGleaning?
     suspend fun discard(sessionId: Long)
+    suspend fun contains(sessionId: Long): Boolean
     suspend fun save(draft: GleaningDraft): Gleaning
     suspend fun all(): List<Gleaning>
     suspend fun count(): Int
