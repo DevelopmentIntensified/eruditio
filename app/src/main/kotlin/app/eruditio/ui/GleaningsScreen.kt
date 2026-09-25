@@ -49,17 +49,16 @@ internal fun GleaningsScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(gleaning.takeaway, style = MaterialTheme.typography.bodyLarge)
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "CURATED LENS",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        gleaning.curatedContext,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    gleaning.curatedContext?.let { curated ->
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "CURATED LENS",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(curated, style = MaterialTheme.typography.bodyMedium)
+                    }
                     Spacer(Modifier.height(12.dp))
                     Text(
                         "SOURCE ANCHOR · ${gleaning.startChar}–${gleaning.endChar}",

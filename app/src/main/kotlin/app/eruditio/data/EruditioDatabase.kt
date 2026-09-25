@@ -11,6 +11,8 @@ import androidx.room.Upsert
 import app.eruditio.core.Entitlement
 import app.eruditio.core.Gleaning
 import app.eruditio.core.GleaningDraft
+import app.eruditio.core.PendingGleaning
+import app.eruditio.core.PendingGleaningDraft
 import app.eruditio.core.LedgerEntry
 import app.eruditio.core.InterceptionResult
 import app.eruditio.core.SessionRecord
@@ -83,7 +85,17 @@ fun GleaningEntity.toGleaning() = Gleaning(
     endChar = endChar,
     takeaway = takeaway,
     sourceContext = sourceContext,
-    curatedContext = curatedContext,
+    curatedContext = curatedContext.takeIf { it.isNotBlank() },
+    createdAtMillis = createdAtMillis,
+)
+
+fun GleaningEntity.toPending() = PendingGleaning(
+    sessionId = sessionId,
+    textId = textId,
+    startChar = startChar,
+    endChar = endChar,
+    sourceContext = sourceContext,
+    curatedContext = curatedContext.takeIf { it.isNotBlank() },
     createdAtMillis = createdAtMillis,
 )
 
@@ -94,7 +106,18 @@ fun GleaningDraft.toEntity(createdAtMillis: Long) = GleaningEntity(
     endChar = endChar,
     takeaway = takeaway,
     sourceContext = sourceContext,
-    curatedContext = curatedContext,
+    curatedContext = curatedContext.orEmpty(),
+    createdAtMillis = createdAtMillis,
+)
+
+fun PendingGleaningDraft.toEntity(createdAtMillis: Long) = GleaningEntity(
+    sessionId = sessionId,
+    textId = textId,
+    startChar = startChar,
+    endChar = endChar,
+    takeaway = "",
+    sourceContext = sourceContext,
+    curatedContext = curatedContext.orEmpty(),
     createdAtMillis = createdAtMillis,
 )
 
@@ -150,11 +173,20 @@ interface GleaningDao {
     @Upsert
     suspend fun upsert(gleaning: GleaningEntity)
 
-    @Query("SELECT * FROM gleanings ORDER BY createdAtMillis DESC")
+    @Query("SELECT * FROM gleanings WHERE takeaway != '' ORDER BY createdAtMillis DESC")
     suspend fun all(): List<GleaningEntity>
 
-    @Query("SELECT COUNT(*) FROM gleanings")
+    @Query("SELECT COUNT(*) FROM gleanings WHERE takeaway != ''")
     suspend fun count(): Int
+
+    @Query("SELECT * FROM gleanings WHERE sessionId = :sessionId AND takeaway = ''")
+    suspend fun pending(sessionId: Long): GleaningEntity?
+
+    @Query("SELECT * FROM gleanings WHERE takeaway = '' ORDER BY createdAtMillis DESC LIMIT 1")
+    suspend fun latestPending(): GleaningEntity?
+
+    @Query("DELETE FROM gleanings WHERE sessionId = :sessionId AND takeaway = ''")
+    suspend fun discard(sessionId: Long)
 }
 
 @Dao

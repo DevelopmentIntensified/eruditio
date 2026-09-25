@@ -58,7 +58,7 @@ class GleaningActivity : ComponentActivity() {
                     onStepBack = vm::stepBack,
                     onRequestExit = vm::requestExit,
                     onKeepEditing = vm::keepEditing,
-                    onDiscardExit = vm::discardExit,
+                    onDiscard = { vm.discard(::returnToToday) },
                     onFinished = ::returnToToday,
                 )
             }
@@ -90,7 +90,7 @@ private fun GleaningFlow(
     onStepBack: () -> Unit,
     onRequestExit: () -> Unit,
     onKeepEditing: () -> Unit,
-    onDiscardExit: () -> Unit,
+    onDiscard: () -> Unit,
     onFinished: () -> Unit,
 ) {
     val source = state.source
@@ -101,7 +101,7 @@ private fun GleaningFlow(
             state.saving -> Unit
             state.step != GleaningStep.NOTICE -> onStepBack()
             state.takeaway.isNotBlank() -> onRequestExit()
-            else -> onFinished()
+            else -> onDiscard()
         }
     }
 
@@ -114,14 +114,14 @@ private fun GleaningFlow(
                 TextButton(onClick = onKeepEditing) { Text("Keep editing") }
             },
             dismissButton = {
-                TextButton(onClick = { onDiscardExit(); onFinished() }) { Text("Discard") }
+                TextButton(onClick = onDiscard) { Text("Discard") }
             },
         )
     }
 
     when {
         source == null && state.loadError == null -> LoadingBody()
-        source == null -> MessageBody("Gleaning unavailable", state.loadError.orEmpty(), onFinished)
+        source == null -> MessageBody("Gleaning unavailable", state.loadError.orEmpty(), onDiscard)
         else -> NoticeCompareKeep(
             state = state,
             source = source,
@@ -192,10 +192,12 @@ private fun NoticeCompareKeep(
                     Text("YOUR TAKEAWAY", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(6.dp))
                     Text(state.takeaway, style = MaterialTheme.typography.bodyLarge)
-                    Spacer(Modifier.height(16.dp))
-                    Text("CURATED LENS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(6.dp))
-                    Text(source.curatedContext, style = MaterialTheme.typography.bodyMedium)
+                    source.curatedContext?.let { curated ->
+                        Spacer(Modifier.height(16.dp))
+                        Text("CURATED LENS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(6.dp))
+                        Text(curated, style = MaterialTheme.typography.bodyMedium)
+                    }
                     Spacer(Modifier.height(16.dp))
                     Text("SOURCE CONTEXT", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(6.dp))
@@ -213,8 +215,10 @@ private fun NoticeCompareKeep(
                 Spacer(Modifier.height(18.dp))
                 PaperSurface(Modifier.fillMaxWidth()) {
                     Text(state.takeaway, style = MaterialTheme.typography.headlineSmall)
-                    Spacer(Modifier.height(12.dp))
-                    Text("Lens: ${source.curatedContext}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    source.curatedContext?.let { curated ->
+                        Spacer(Modifier.height(12.dp))
+                        Text("Lens: $curated", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     Spacer(Modifier.height(8.dp))
                     Text("Source: ${source.title}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

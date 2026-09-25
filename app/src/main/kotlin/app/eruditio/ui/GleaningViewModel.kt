@@ -24,7 +24,7 @@ internal data class GleaningSource(
     val startChar: Long,
     val endChar: Long,
     val sourceContext: String,
-    val curatedContext: String,
+    val curatedContext: String?,
 )
 
 internal data class GleaningUiState(
@@ -82,10 +82,6 @@ internal class GleaningViewModel(
         updateState { it.copy(showExitDialog = false) }
     }
 
-    fun discardExit() {
-        updateState { it.copy(showExitDialog = false) }
-    }
-
     fun compare() {
         updateState {
             if (it.takeaway.isNotBlank()) it.copy(step = GleaningStep.COMPARE) else it
@@ -137,6 +133,16 @@ internal class GleaningViewModel(
         }
     }
 
+    fun discard(onComplete: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                container.gleanings.discard(sessionId)
+            } finally {
+                onComplete()
+            }
+        }
+    }
+
     fun startOver() {
         updateState {
             it.copy(
@@ -160,6 +166,31 @@ internal class GleaningViewModel(
     }
 
     private suspend fun loadSource() {
+        val pending = container.gleanings.pending(sessionId)
+        if (pending != null) {
+            val session = container.sessions.sessionFor(sessionId)
+            if (session?.endChar == null) {
+                container.gleanings.discard(sessionId)
+                updateState { it.copy(loadError = "This reading session is no longer available.") }
+                return
+            }
+            val meta = container.library.meta(pending.textId)
+            updateState {
+                it.copy(
+                    source = GleaningSource(
+                        sessionId = pending.sessionId,
+                        textId = pending.textId,
+                        title = meta?.title ?: pending.textId,
+                        author = meta?.author.orEmpty(),
+                        startChar = pending.startChar,
+                        endChar = pending.endChar,
+                        sourceContext = pending.sourceContext,
+                        curatedContext = pending.curatedContext,
+                    ),
+                )
+            }
+            return
+        }
         val session = container.sessions.sessionFor(sessionId)
         val end = session?.endChar
         if (session == null || end == null || end <= session.startChar) {
@@ -190,7 +221,7 @@ internal class GleaningViewModel(
             startChar = excerpt.startChar,
             endChar = excerpt.endChar,
             sourceContext = excerpt.text,
-            curatedContext = GleaningLens.forGroup(meta?.group.orEmpty()),
+            curatedContext = GleaningLens.forSource(textId, excerpt.text),
         )
     }
 

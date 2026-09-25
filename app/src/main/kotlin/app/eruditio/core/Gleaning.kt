@@ -1,7 +1,5 @@
 package app.eruditio.core
 
-import java.util.Locale
-
 /** The user's source-linked takeaway after a reading session. */
 class GleaningDraft(
     val sessionId: Long,
@@ -10,11 +8,11 @@ class GleaningDraft(
     val endChar: Long,
     takeaway: String,
     sourceContext: String,
-    curatedContext: String,
+    curatedContext: String?,
 ) {
     val takeaway: String = takeaway.trim()
-    val sourceContext: String = sourceContext.trim()
-    val curatedContext: String = curatedContext.trim()
+    val sourceContext: String = sourceContext
+    val curatedContext: String? = curatedContext?.trim()?.takeIf { it.isNotEmpty() }
 
     init {
         require(sessionId > 0L) { "A gleaning needs a session" }
@@ -22,7 +20,6 @@ class GleaningDraft(
         require(startChar >= 0L && endChar > startChar) { "A gleaning needs a source range" }
         require(this.takeaway.isNotBlank()) { "A gleaning needs the reader's takeaway" }
         require(this.sourceContext.isNotBlank()) { "A gleaning needs source context" }
-        require(this.curatedContext.isNotBlank()) { "A gleaning needs a curated lens" }
     }
 }
 
@@ -34,17 +31,51 @@ data class Gleaning(
     val endChar: Long,
     val takeaway: String,
     val sourceContext: String,
-    val curatedContext: String,
+    val curatedContext: String?,
     val createdAtMillis: Long,
 )
 
-/** Local editorial prompts used to compare a takeaway with its source. */
-object GleaningLens {
-    fun forGroup(group: String): String = when (group.lowercase(Locale.ROOT)) {
-        Groups.CHRISTIAN -> "What does this passage invite you to practice, not merely admire?"
-        Groups.BIOGRAPHY -> "What choice or habit does this life make visible?"
-        else -> "What does this passage ask you to notice—and question?"
+/** A durable completion hand-off waiting for the reader's takeaway. */
+class PendingGleaningDraft(
+    val sessionId: Long,
+    val textId: String,
+    val startChar: Long,
+    val endChar: Long,
+    sourceContext: String,
+    curatedContext: String?,
+) {
+    val sourceContext: String = sourceContext
+    val curatedContext: String? = curatedContext?.trim()?.takeIf { it.isNotEmpty() }
+
+    init {
+        require(sessionId > 0L)
+        require(textId.isNotBlank())
+        require(startChar >= 0L && endChar > startChar)
+        require(this.sourceContext.isNotBlank())
     }
+}
+
+data class PendingGleaning(
+    val sessionId: Long,
+    val textId: String,
+    val startChar: Long,
+    val endChar: Long,
+    val sourceContext: String,
+    val curatedContext: String?,
+    val createdAtMillis: Long,
+)
+
+/** Small, local content lenses; absence is valid and never gets fabricated. */
+object GleaningLens {
+    fun forSource(textId: String, sourceContext: String): String? =
+        if (
+            textId == "euthyphro" &&
+            sourceContext.contains("Piety, then, is that which is dear to the gods")
+        ) {
+            "Euthyphro’s answer sounds exact, but it hides a circle: the action is called pious because the gods approve it, while approval is inferred from the action’s piety."
+        } else {
+            null
+        }
 }
 
 data class SourceExcerpt(
@@ -72,8 +103,32 @@ object GleaningSourceBuilder {
     }
 }
 
+object GleaningDraftFactory {
+    fun pending(
+        sessionId: Long,
+        textId: String,
+        startChar: Long,
+        endChar: Long,
+        text: String,
+    ): PendingGleaningDraft? {
+        val excerpt = GleaningSourceBuilder.build(text, startChar, endChar) ?: return null
+        return PendingGleaningDraft(
+            sessionId = sessionId,
+            textId = textId,
+            startChar = excerpt.startChar,
+            endChar = excerpt.endChar,
+            sourceContext = excerpt.text,
+            curatedContext = GleaningLens.forSource(textId, excerpt.text),
+        )
+    }
+}
+
 /** Local persistence seam for gleanings; no scheduler or grading state. */
 interface GleaningStore {
+    suspend fun prepare(draft: PendingGleaningDraft): PendingGleaning
+    suspend fun pending(sessionId: Long): PendingGleaning?
+    suspend fun latestPending(): PendingGleaning?
+    suspend fun discard(sessionId: Long)
     suspend fun save(draft: GleaningDraft): Gleaning
     suspend fun all(): List<Gleaning>
     suspend fun count(): Int

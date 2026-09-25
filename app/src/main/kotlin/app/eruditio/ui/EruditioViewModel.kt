@@ -10,6 +10,7 @@ import app.eruditio.core.Entitlement
 import app.eruditio.core.Gleaning
 import app.eruditio.core.LedgerEntry
 import app.eruditio.core.MasteryLevel
+import app.eruditio.core.PendingGleaning
 import app.eruditio.core.RecallGrade
 import app.eruditio.core.SessionRecord
 import app.eruditio.core.SessionStart
@@ -54,6 +55,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         val resumeTextId: String? = null,
         val reviewItems: List<HomeReviewItem> = emptyList(),
         val reviewIsChallenge: Boolean = false,
+        val pendingGleaning: PendingGleaning? = null,
     )
 
     private data class ReviewSnapshot(
@@ -146,6 +148,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
     private suspend fun refreshOnce() {
         val review = reviewSnapshot()
         val savedGleanings = container.gleanings.all()
+        val pendingGleaning = container.gleanings.latestPending()
         val gleaningCount = container.gleanings.count()
         val progress = container.progressById()
         val recent = container.sessions.recentSessions(5)
@@ -183,6 +186,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
             resumeTextId = resumeTextId,
             reviewItems = reviewItems,
             reviewIsChallenge = review.isChallenge,
+            pendingGleaning = pendingGleaning,
         )
         reviewState.value = ReviewState(
             current = head,

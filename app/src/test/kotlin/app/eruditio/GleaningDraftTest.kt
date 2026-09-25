@@ -19,7 +19,7 @@ class GleaningDraftTest {
         )
 
         assertEquals("A confident answer can still be circular.", draft.takeaway)
-        assertEquals("Piety, then, is that which is dear to the gods.", draft.sourceContext)
+        assertEquals("  Piety, then, is that which is dear to the gods.  ", draft.sourceContext)
         assertEquals("Notice what the answer treats as already settled.", draft.curatedContext)
         assertEquals(120L, draft.startChar)
         assertEquals(480L, draft.endChar)
@@ -48,14 +48,28 @@ class GleaningDraftTest {
     }
 
     @Test
-    fun `bundled lenses stay local to the content group`() {
-        assertEquals(
-            "What does this passage invite you to practice, not merely admire?",
-            app.eruditio.core.GleaningLens.forGroup("christian"),
+    fun `pending draft captures source before the reader writes`() {
+        val pending = app.eruditio.core.GleaningDraftFactory.pending(
+            sessionId = 4L,
+            textId = "apology",
+            startChar = 0L,
+            endChar = 17L,
+            text = "  first thought  ",
         )
+
+        assertEquals("  first thought  ", pending?.sourceContext)
+        assertEquals(null, pending?.curatedContext)
+    }
+
+    @Test
+    fun `curated lenses are optional and passage-specific`() {
         assertEquals(
-            "What does this passage ask you to notice—and question?",
-            app.eruditio.core.GleaningLens.forGroup("ancient"),
+            "Euthyphro’s answer sounds exact, but it hides a circle: the action is called pious because the gods approve it, while approval is inferred from the action’s piety.",
+            app.eruditio.core.GleaningLens.forSource(
+                "euthyphro",
+                "Piety, then, is that which is dear to the gods",
+            ),
         )
+        assertEquals(null, app.eruditio.core.GleaningLens.forSource("apology", "A passage"))
     }
 }
