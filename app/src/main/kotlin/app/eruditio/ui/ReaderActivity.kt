@@ -34,7 +34,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.collectAsState
@@ -64,7 +63,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.eruditio.AppContainer
 import app.eruditio.EruditioApp
-import app.eruditio.MainActivity
 import app.eruditio.R
 import app.eruditio.core.CompletedSession
 import app.eruditio.core.Groups
@@ -111,7 +109,7 @@ class ReaderActivity : androidx.activity.ComponentActivity() {
         if (gleaningSessionId != null) {
             startActivity(GleaningActivity.intent(this, gleaningSessionId))
         } else if (isTaskRoot) {
-            returnToEruditioToday(this)
+            returnToTodayAndSelect(this)
         }
         finish()
     }
@@ -168,18 +166,11 @@ private data class Loaded(
     val startItem: Int,
 )
 
-private data class CompletedView(
-    val title: String,
-    val completed: CompletedSession,
-    val next: app.eruditio.data.TextMeta?,
-)
-
 @OptIn(FlowPreview::class)
 @Composable
 private fun ReaderScreen(container: AppContainer, sessionId: Long) {
     val loaded = remember { mutableStateOf<Loaded?>(null) }
-    val completed = remember { mutableStateOf<CompletedView?>(null) }
-    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     LaunchedEffect(sessionId) {
         val record = container.sessions.sessionFor(sessionId) ?: return@LaunchedEffect
@@ -198,18 +189,22 @@ private fun ReaderScreen(container: AppContainer, sessionId: Long) {
     }
 
     // The activity owns pause-time flush wiring and the checkpoint leave path;
-    // the body reaches both through callbacks (the onCompleted pattern) instead
-    // of downcasting its compose context.
-    val activity = LocalContext.current as? ReaderActivity
-    when {
-        completed.value != null -> CompletedBody(container, completed.value!!)
-        loaded.value != null -> ReadingBody(
-            container,
-            loaded.value!!,
+    // the body reaches both through callbacks instead of downcasting Compose.
+    val activity = context as? ReaderActivity
+    val current = loaded.value
+    if (current == null) {
+        Column(Modifier.fillMaxSize().padding(24.dp)) { Text("Loading…") }
+    } else {
+        ReadingBody(
+            container = container,
+            loaded = current,
             onRegisterFlush = { flush -> activity?.registerFlush(flush) },
-            onLeave = { sessionId -> activity?.leaveAtCheckpoint(sessionId) },
-        ) { completed.value = it }
-        else -> Column(Modifier.fillMaxSize().padding(24.dp)) { Text("Loading…") }
+            onLeave = { completedSessionId -> activity?.leaveAtCheckpoint(completedSessionId) },
+            onCompleted = { completed ->
+                context.startActivity(GleaningActivity.intent(context, completed.sessionId))
+                (context as? Activity)?.finish()
+            },
+        )
     }
 }
 
@@ -220,7 +215,7 @@ private fun ReadingBody(
     loaded: Loaded,
     onRegisterFlush: (flush: (() -> Unit)?) -> Unit,
     onLeave: (Long?) -> Unit,
-    onCompleted: (CompletedView) -> Unit,
+    onCompleted: (CompletedSession) -> Unit,
 ) {
     val listState = rememberLazyListState()
     val readerText = loaded.readerText
@@ -439,18 +434,10 @@ private fun ReadingBody(
                     if (done != null) {
                         val resumeStart = readerText.items[firstVisible].startChar
                         container.positions.save(loaded.textId, resumeStart)
-                        // Recommended next reading: another unstarted classic,
-                        // same content group first (in-app momentum over feeds).
-                        val progressById = container.progressById()
-                        val next = suggestedNext(
-                            container.library.texts,
-                            progressById,
-                            loaded.textId,
-                            loaded.group,
-                        )
-                        onCompleted(CompletedView(loaded.title, done, next))
+                        onCompleted(done)
                     } else {
                         completing = false
+                        onRegisterFlush { saveTopLine() }
                     }
                 }
             },
@@ -725,40 +712,6 @@ private fun Rail(
                 center = Offset(w / 2f, markerFraction * h),
             )
         }
-    }
-}
-
-@Composable
-private fun CompletedBody(container: AppContainer, s: CompletedView) {
-    // Compose context here is the ReaderActivity; the app context cannot start activities or finish.
-    val context = LocalContext.current
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("Session complete", style = MaterialTheme.typography.headlineMedium)
-        Text("${s.title} · ready to glean")
-        Button(
-            onClick = {
-                context.startActivity(GleaningActivity.intent(context, s.completed.sessionId))
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Glean this session →") }
-        s.next?.let { next ->
-            val scope = rememberCoroutineScope()
-            OutlinedButton(
-                onClick = {
-                    scope.launch {
-                        when (val start = container.sessions.openSession(next.id)) {
-                            is app.eruditio.core.SessionStart.Opened -> {
-                                openReader(context, start.sessionId)
-                                (context as? Activity)?.finish()
-                            }
-                            app.eruditio.core.SessionStart.Locked -> Unit
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Read next: ${next.title}") }
-        }
-        Button(onClick = { returnToEruditioToday(context) }, modifier = Modifier.fillMaxWidth()) { Text("Done") }
     }
 }
 

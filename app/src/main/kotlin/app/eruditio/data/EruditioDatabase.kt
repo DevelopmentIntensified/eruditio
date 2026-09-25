@@ -150,8 +150,8 @@ interface GleaningDao {
     @Upsert
     suspend fun upsert(gleaning: GleaningEntity)
 
-    @Query("SELECT * FROM gleanings ORDER BY createdAtMillis DESC LIMIT :limit")
-    suspend fun recent(limit: Int): List<GleaningEntity>
+    @Query("SELECT * FROM gleanings ORDER BY createdAtMillis DESC")
+    suspend fun all(): List<GleaningEntity>
 
     @Query("SELECT COUNT(*) FROM gleanings")
     suspend fun count(): Int

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import app.eruditio.AppContainer
 import app.eruditio.core.GleaningDraft
 import app.eruditio.core.GleaningLens
+import app.eruditio.core.GleaningSourceBuilder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +35,7 @@ internal data class GleaningUiState(
     val saved: Boolean = false,
     val saving: Boolean = false,
     val saveError: String? = null,
+    val showExitDialog: Boolean = false,
 )
 
 /** Owns the Gleaning flow state and persistence; the Compose screen only renders it. */
@@ -68,6 +70,20 @@ internal class GleaningViewModel(
 
     fun setTakeaway(value: String) {
         updateState { it.copy(takeaway = value) }
+    }
+
+    fun requestExit() {
+        updateState {
+            if (it.takeaway.isNotBlank() && !it.saved) it.copy(showExitDialog = true) else it
+        }
+    }
+
+    fun keepEditing() {
+        updateState { it.copy(showExitDialog = false) }
+    }
+
+    fun discardExit() {
+        updateState { it.copy(showExitDialog = false) }
     }
 
     fun compare() {
@@ -123,7 +139,13 @@ internal class GleaningViewModel(
 
     fun startOver() {
         updateState {
-            it.copy(step = GleaningStep.NOTICE, takeaway = "", saved = false, saveError = null)
+            it.copy(
+                step = GleaningStep.NOTICE,
+                takeaway = "",
+                saved = false,
+                saveError = null,
+                showExitDialog = false,
+            )
         }
     }
 
@@ -158,30 +180,21 @@ internal class GleaningViewModel(
         endChar: Long,
         text: String,
     ): GleaningSource? {
-        val textLength = text.length.toLong()
-        if (textLength == 0L) return null
-        val start = startChar.coerceIn(0L, textLength - 1L).toInt()
-        val endIndex = endChar.coerceIn(start.toLong() + 1L, textLength).toInt()
-        val excerpt = text.substring(start, endIndex)
-            .replace(Regex("\\s+"), " ")
-            .trim()
-            .take(MAX_CONTEXT_CHARS)
-        if (excerpt.isBlank()) return null
+        val excerpt = GleaningSourceBuilder.build(text, startChar, endChar) ?: return null
         val meta = container.library.meta(textId)
         return GleaningSource(
             sessionId = sessionId,
             textId = textId,
             title = meta?.title ?: textId,
             author = meta?.author.orEmpty(),
-            startChar = start.toLong(),
-            endChar = endIndex.toLong(),
-            sourceContext = excerpt,
+            startChar = excerpt.startChar,
+            endChar = excerpt.endChar,
+            sourceContext = excerpt.text,
             curatedContext = GleaningLens.forGroup(meta?.group.orEmpty()),
         )
     }
 
     private companion object {
-        const val MAX_CONTEXT_CHARS = 1_200
         const val KEY_STEP = "step"
         const val KEY_TAKEAWAY = "takeaway"
         const val KEY_SAVED = "saved"

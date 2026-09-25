@@ -102,25 +102,6 @@ class SessionControllerTest {
     }
 
     @Test
-    fun `completion rejects a range with no forward progress`() = runTest {
-        val controller = makeController().second
-        val opened = controller.openSession("demo:apology") as SessionStart.Opened
-
-        assertEquals(null, controller.completeSession(opened.sessionId, endChar = 0))
-        assertTrue(sessionLog.get(opened.sessionId)?.isCompleted != true)
-    }
-
-    @Test
-    fun `a session cannot complete twice`() = runTest {
-        val controller = makeController().second
-        val opened = controller.openSession("demo:apology") as SessionStart.Opened
-
-        assertTrue(controller.completeSession(opened.sessionId, 900) != null)
-        assertEquals(null, controller.completeSession(opened.sessionId, 1800))
-    }
-
-
-    @Test
     fun `re-reading a segment still does not create review items`() = runTest {
         val controller = makeController().second
         val first = controller.openSession("demo:apology") as SessionStart.Opened

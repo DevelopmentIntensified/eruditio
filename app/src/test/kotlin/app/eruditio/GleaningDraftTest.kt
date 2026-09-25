@@ -36,6 +36,18 @@ class GleaningDraftTest {
     }
 
     @Test
+    fun `source builder preserves the exact local excerpt`() {
+        val excerpt = app.eruditio.core.GleaningSourceBuilder.build(
+            text = "  first\n second   third  ",
+            requestedStart = 2L,
+            requestedEnd = 25L,
+        )
+
+        assertEquals(2L, excerpt?.startChar)
+        assertEquals("first\n second   third  ", excerpt?.text)
+    }
+
+    @Test
     fun `bundled lenses stay local to the content group`() {
         assertEquals(
             "What does this passage invite you to practice, not merely admire?",

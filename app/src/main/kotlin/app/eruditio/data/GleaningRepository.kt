@@ -17,8 +17,7 @@ class RoomGleaningStore(
         return entity.toGleaning()
     }
 
-    override suspend fun recent(limit: Int): List<Gleaning> =
-        dao.recent(limit.coerceAtLeast(0)).map { it.toGleaning() }
+    override suspend fun all(): List<Gleaning> = dao.all().map { it.toGleaning() }
 
     override suspend fun count(): Int = dao.count()
 }

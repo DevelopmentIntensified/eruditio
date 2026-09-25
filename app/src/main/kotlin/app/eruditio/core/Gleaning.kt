@@ -41,15 +41,40 @@ data class Gleaning(
 /** Local editorial prompts used to compare a takeaway with its source. */
 object GleaningLens {
     fun forGroup(group: String): String = when (group.lowercase(Locale.ROOT)) {
-        "christian" -> "What does this passage invite you to practice, not merely admire?"
-        "biography" -> "What choice or habit does this life make visible?"
+        Groups.CHRISTIAN -> "What does this passage invite you to practice, not merely admire?"
+        Groups.BIOGRAPHY -> "What choice or habit does this life make visible?"
         else -> "What does this passage ask you to notice—and question?"
+    }
+}
+
+data class SourceExcerpt(
+    val startChar: Long,
+    val endChar: Long,
+    val text: String,
+)
+
+/** Deterministic source snapshot preparation; no Android or UI dependencies. */
+object GleaningSourceBuilder {
+    fun build(
+        text: String,
+        requestedStart: Long,
+        requestedEnd: Long,
+    ): SourceExcerpt? {
+        val textLength = text.length.toLong()
+        if (textLength == 0L || requestedStart < 0L || requestedEnd > textLength || requestedEnd <= requestedStart) {
+            return null
+        }
+        val start = requestedStart.toInt()
+        val end = requestedEnd.toInt()
+        val excerpt = text.substring(start, end)
+        if (excerpt.isBlank()) return null
+        return SourceExcerpt(start.toLong(), end.toLong(), excerpt)
     }
 }
 
 /** Local persistence seam for gleanings; no scheduler or grading state. */
 interface GleaningStore {
     suspend fun save(draft: GleaningDraft): Gleaning
-    suspend fun recent(limit: Int): List<Gleaning>
+    suspend fun all(): List<Gleaning>
     suspend fun count(): Int
 }

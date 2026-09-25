@@ -25,9 +25,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.createSavedStateHandle
@@ -59,6 +56,9 @@ class GleaningActivity : ComponentActivity() {
                     onSave = vm::save,
                     onStartOver = vm::startOver,
                     onStepBack = vm::stepBack,
+                    onRequestExit = vm::requestExit,
+                    onKeepEditing = vm::keepEditing,
+                    onDiscardExit = vm::discardExit,
                     onFinished = ::returnToToday,
                 )
             }
@@ -66,7 +66,7 @@ class GleaningActivity : ComponentActivity() {
     }
 
     private fun returnToToday() {
-        returnToEruditioToday(this)
+        returnToTodayAndSelect(this)
         finish()
     }
 
@@ -88,29 +88,33 @@ private fun GleaningFlow(
     onSave: () -> Unit,
     onStartOver: () -> Unit,
     onStepBack: () -> Unit,
+    onRequestExit: () -> Unit,
+    onKeepEditing: () -> Unit,
+    onDiscardExit: () -> Unit,
     onFinished: () -> Unit,
 ) {
-    var showExitDialog by remember { mutableStateOf(false) }
     val source = state.source
 
     BackHandler {
         when {
+            state.saved -> onFinished()
+            state.saving -> Unit
             state.step != GleaningStep.NOTICE -> onStepBack()
-            state.takeaway.isNotBlank() -> showExitDialog = true
+            state.takeaway.isNotBlank() -> onRequestExit()
             else -> onFinished()
         }
     }
 
-    if (showExitDialog) {
+    if (state.showExitDialog) {
         AlertDialog(
-            onDismissRequest = { showExitDialog = false },
+            onDismissRequest = onKeepEditing,
             title = { Text("Leave this gleaning?") },
             text = { Text("Your takeaway has not been kept yet.") },
             confirmButton = {
-                TextButton(onClick = { showExitDialog = false }) { Text("Keep editing") }
+                TextButton(onClick = onKeepEditing) { Text("Keep editing") }
             },
             dismissButton = {
-                TextButton(onClick = { showExitDialog = false; onFinished() }) { Text("Discard") }
+                TextButton(onClick = { onDiscardExit(); onFinished() }) { Text("Discard") }
             },
         )
     }

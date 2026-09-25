@@ -145,7 +145,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
     /** One ordered snapshot; an older refresh cannot publish after a newer one. */
     private suspend fun refreshOnce() {
         val review = reviewSnapshot()
-        val savedGleanings = container.gleanings.recent(50)
+        val savedGleanings = container.gleanings.all()
         val gleaningCount = container.gleanings.count()
         val progress = container.progressById()
         val recent = container.sessions.recentSessions(5)

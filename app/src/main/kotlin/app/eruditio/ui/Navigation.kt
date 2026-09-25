@@ -5,7 +5,7 @@ import android.content.Intent
 import app.eruditio.EruditioApp
 import app.eruditio.MainActivity
 
-internal fun returnToEruditioToday(context: Context) {
+internal fun returnToTodayAndSelect(context: Context) {
     (context.applicationContext as? EruditioApp)?.container?.pauseToHome?.value = true
     context.startActivity(
         Intent(context, MainActivity::class.java)
