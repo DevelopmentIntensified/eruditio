@@ -27,7 +27,6 @@ sealed interface SessionStart {
 data class CompletedSession(
     val sessionId: Long,
     val textId: String,
-    val newConcepts: Int,
 )
 
 data class SessionRecord(
@@ -48,7 +47,6 @@ class SessionController(
     private val interceptionLog: InterceptionLog,
     private val sessionLog: SessionLog,
     private val positionStore: PositionStore,
-    private val concepts: ConceptSource,
     private val gate: TrialGate,
     private val clock: Clock,
 ) {
@@ -92,25 +90,16 @@ class SessionController(
 
     /**
      * Check-in: the segment read between the session's start position and
-     * `endChar` registers a completion, credits the trial gate, and enrolls
-     * the segment's concepts (new ones only — grading existing ones is the
-     * user's recall, never automatic).
+     * `endChar` registers a completion and credits the trial gate. Reading
+     * completion is not memorization; only an explicit curated content path
+     * may create review items later.
      */
     suspend fun completeSession(sessionId: Long, endChar: Long): CompletedSession? {
         val session = sessionLog.get(sessionId) ?: return null
         if (session.isCompleted) return null
         sessionLog.complete(sessionId, endChar, clock.epochMillis, clock.epochDay)
         gate.markSessionCompleted()
-        val conceptIds = concepts.conceptsFor(session.textId, session.startChar, endChar)
-        val known = ledger.conceptIds()
-        var enrolled = 0
-        for (id in conceptIds) {
-            if (id !in known) {
-                ledger.upsert(scheduler.enroll(id, clock.epochDay))
-                enrolled++
-            }
-        }
-        return CompletedSession(sessionId, session.textId, enrolled)
+        return CompletedSession(sessionId, session.textId)
     }
 
     suspend fun dueToday(limit: Int = 10): List<LedgerEntry> =

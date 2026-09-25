@@ -26,7 +26,6 @@ class SessionControllerTest {
     private val ledger = FakeLedgerStore()
     private val interceptLog = FakeInterceptionLog()
     private val sessionLog = FakeSessionLog()
-    private val concepts = FakeConceptSource()
     private val entitlement = FakeEntitlementStore()
     private val scheduler = ReviewScheduler()
 
@@ -43,7 +42,6 @@ class SessionControllerTest {
             interceptionLog = interceptLog,
             sessionLog = sessionLog,
             positionStore = positionStore,
-            concepts = concepts,
             gate = TrialGate(entitlement, isDebug = isDebug),
             clock = clock,
         )
@@ -90,25 +88,28 @@ class SessionControllerTest {
     }
 
     @Test
-    fun `completing a session changes the due-review set`() = runTest {
+    fun `completing a session records completion without enrolling passive concepts`() = runTest {
         val (clock, controller) = makeController()
         val opened = controller.openSession("demo:apology") as SessionStart.Opened
-        assertTrue(controller.dueToday().isEmpty()) // nothing due today
+        assertTrue(controller.dueToday().isEmpty())
+
         val completed = controller.completeSession(opened.sessionId, endChar = 900)
-        assertEquals(1, completed?.newConcepts) // the completed segment feeds the engine
+
+        assertEquals("demo:apology", completed?.textId)
         clock.advance(1)
-        assertEquals(listOf("demo:apology#c0"), controller.dueToday().map { it.conceptId })
+        assertTrue(controller.dueToday().isEmpty())
+        assertTrue(ledger.all().isEmpty())
     }
 
     @Test
-    fun `re-reading the same segment enrolls concepts once`() = runTest {
+    fun `re-reading a segment still does not create review items`() = runTest {
         val controller = makeController().second
-        val s1 = controller.openSession("demo:apology") as SessionStart.Opened
-        controller.completeSession(s1.sessionId, 900)
-        val s2 = controller.openSession("demo:apology") as SessionStart.Opened
-        val completed2 = controller.completeSession(s2.sessionId, 1800)
-        assertEquals(0, completed2?.newConcepts)
-        assertEquals(1, ledger.all().size)
+        val first = controller.openSession("demo:apology") as SessionStart.Opened
+        controller.completeSession(first.sessionId, 900)
+        val second = controller.openSession("demo:apology") as SessionStart.Opened
+        controller.completeSession(second.sessionId, 1800)
+
+        assertTrue(ledger.all().isEmpty())
     }
 
     @Test
@@ -179,7 +180,6 @@ class SessionControllerTest {
             interceptionLog = interceptLog,
             sessionLog = sessionLog,
             positionStore = FakePositionStore(),
-            concepts = concepts,
             gate = TrialGate(entitlement, isDebug = false),
             clock = clock,
         )

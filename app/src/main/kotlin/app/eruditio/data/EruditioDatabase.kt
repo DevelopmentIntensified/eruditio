@@ -8,6 +8,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Upsert
 import app.eruditio.core.Entitlement
+import app.eruditio.core.Gleaning
+import app.eruditio.core.GleaningDraft
 import app.eruditio.core.LedgerEntry
 import app.eruditio.core.InterceptionResult
 import app.eruditio.core.SessionRecord
@@ -30,6 +32,17 @@ data class SessionEntity(
     val completedAtMillis: Long? = null,
     val completedEpochDay: Long? = null,
     val readMillis: Long = 0,
+)
+
+@Entity(tableName = "gleanings")
+data class GleaningEntity(
+    @PrimaryKey val sessionId: Long,
+    val textId: String,
+    val startChar: Long,
+    val endChar: Long,
+    val takeaway: String,
+    val sourceContext: String,
+    val createdAtMillis: Long,
 )
 
 @Entity(tableName = "interceptions")
@@ -60,6 +73,26 @@ data class EntitlementEntity(
 fun LedgerEntity.toEntry() = LedgerEntry(conceptId, repetitions, intervalDays, lastEpochDay, dueEpochDay)
 
 fun LedgerEntry.toEntity() = LedgerEntity(conceptId, repetitions, intervalDays, lastEpochDay, dueEpochDay)
+
+fun GleaningEntity.toGleaning() = Gleaning(
+    sessionId = sessionId,
+    textId = textId,
+    startChar = startChar,
+    endChar = endChar,
+    takeaway = takeaway,
+    sourceContext = sourceContext,
+    createdAtMillis = createdAtMillis,
+)
+
+fun GleaningDraft.toEntity(createdAtMillis: Long) = GleaningEntity(
+    sessionId = sessionId,
+    textId = textId,
+    startChar = startChar,
+    endChar = endChar,
+    takeaway = takeaway,
+    sourceContext = sourceContext,
+    createdAtMillis = createdAtMillis,
+)
 
 fun EntitlementEntity.toEntitlement() = Entitlement(owned, freeSessionsUsed)
 
@@ -106,6 +139,15 @@ interface SessionDao {
 
     @Query("SELECT COALESCE(SUM(readMillis), 0) FROM sessions WHERE startedAtMillis >= :sinceMillis")
     suspend fun readMillisSince(sinceMillis: Long): Long
+}
+
+@Dao
+interface GleaningDao {
+    @Upsert
+    suspend fun upsert(gleaning: GleaningEntity)
+
+    @Query("SELECT * FROM gleanings ORDER BY createdAtMillis DESC LIMIT :limit")
+    suspend fun recent(limit: Int): List<GleaningEntity>
 }
 
 @Dao

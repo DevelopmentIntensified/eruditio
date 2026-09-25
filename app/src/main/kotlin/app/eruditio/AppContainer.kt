@@ -3,6 +3,7 @@ package app.eruditio
 import android.app.Application
 import android.content.Context
 import app.eruditio.core.ConceptSource
+import app.eruditio.core.GleaningStore
 import app.eruditio.core.LedgerStore
 import app.eruditio.core.PositionStore
 import app.eruditio.core.ReviewScheduler
@@ -14,6 +15,7 @@ import app.eruditio.data.EruditioDatabase
 import app.eruditio.data.PlayBillingGate
 import app.eruditio.data.ReadingSettings
 import app.eruditio.data.EntitlementRepository
+import app.eruditio.data.RoomGleaningStore
 import app.eruditio.data.RoomInterceptionLog
 import app.eruditio.data.RoomLedgerStore
 import app.eruditio.data.RoomSessionLog
@@ -57,6 +59,7 @@ class AppContainer(private val app: Application) {
     val ledger: LedgerStore = RoomLedgerStore(db.ledgerDao())
     val concepts: ConceptSource = SegmentConcepts(library)
     val sessionLog: SessionLog = RoomSessionLog(db.sessionDao())
+    val gleanings: GleaningStore = RoomGleaningStore(db.gleaningDao(), clock)
 
     /** Seam adapter: offset primitive only — Room entities never cross into the core. */
     val positionStore: PositionStore = object : PositionStore {
@@ -72,7 +75,6 @@ class AppContainer(private val app: Application) {
         interceptionLog = interceptionLog,
         sessionLog = sessionLog,
         positionStore = positionStore,
-        concepts = concepts,
         gate = trial,
         clock = clock,
     )
