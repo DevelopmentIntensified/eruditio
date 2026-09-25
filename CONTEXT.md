@@ -32,7 +32,7 @@ _Avoid_: Substitute, swap
 One short reading engagement in a bundled text, spanning from a resume position to a completion point.
 
 **Gleaning**:
-The learning output from a session: the reader's own takeaway paired with curated context, both tied to the source passage.
+The learning output from a session: the reader's own takeaway paired with source context, with curated interpretation added when the content provides it.
 _Avoid_: Review item, bare summary, bare highlight
 
 **Segment**:
