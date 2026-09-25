@@ -39,10 +39,24 @@ abstract class EruditioDatabase : RoomDatabase() {
         }
 
         /** v3: dropped reading_positions.paragraphIndex (write-only — the reader
-         *  re-derives the item index from charOffset via ReaderText). */
+         *  re-derives the item index from charOffset via ReaderText). Rebuild the
+         *  table because Android API 26 SQLite cannot DROP COLUMN. */
         private val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE reading_positions DROP COLUMN paragraph_index")
+                db.execSQL(
+                    "CREATE TABLE reading_positions_v3 (" +
+                        "textId TEXT NOT NULL, " +
+                        "charOffset INTEGER NOT NULL, " +
+                        "updatedAtMillis INTEGER NOT NULL, " +
+                        "PRIMARY KEY(textId))",
+                )
+                db.execSQL(
+                    "INSERT INTO reading_positions_v3 " +
+                        "(textId, charOffset, updatedAtMillis) " +
+                        "SELECT textId, charOffset, updatedAtMillis FROM reading_positions",
+                )
+                db.execSQL("DROP TABLE reading_positions")
+                db.execSQL("ALTER TABLE reading_positions_v3 RENAME TO reading_positions")
             }
         }
 
