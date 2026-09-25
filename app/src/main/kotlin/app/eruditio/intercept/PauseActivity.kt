@@ -55,21 +55,23 @@ class PauseActivity : androidx.activity.ComponentActivity() {
         val target = intent.getStringExtra(EXTRA_TARGET).orEmpty()
         val container = (application as EruditioApp).container
 
-        // Story 4: a dismissed pause screen still records its outcome. Back
-        // means the user proceeds to the app beneath the overlay — the same
-        // *continued* outcome the Continue button records. (The system Home
+        var enabled by mutableStateOf(false)
+
+        // Back means Continue, so it must obey the same friction delay. Early
+        // Back presses are consumed without recording; once the choice opens,
+        // Back records *continued* and reveals the target app. (The system Home
         // button is not interceptable from an Activity and stays unrecorded.)
         onBackPressedDispatcher.addCallback(
             this,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    cont(target)
-                    finish()
+                    if (enabled) {
+                        cont(target)
+                        finish()
+                    }
                 }
             },
         )
-
-        var enabled by mutableStateOf(false)
 
         setContent {
             EruditioTheme(container.themes.palette.value) {
