@@ -3,5 +3,10 @@
     "textId": "euthyphro",
     "anchor": "Piety, then, is that which is dear to the gods",
     "context": "Euthyphro’s answer sounds exact, but it hides a circle: the action is called pious because the gods approve it, while approval is inferred from the action’s piety."
+  },
+  {
+    "textId": "apology",
+    "anchor": "the unexamined life is not worth living",
+    "context": "Socrates predicts the refusal before making the claim: “you are still less likely to believe me.” The worth of the claim is not bound to its success with this audience — he offers it while already conceding it will not land."
   }
 ]

@@ -189,8 +189,13 @@ interface GleaningDao {
     @Query("SELECT * FROM gleanings WHERE status = 'pending' ORDER BY createdAtMillis DESC LIMIT 1")
     suspend fun latestPending(): GleaningEntity?
 
-    @Query("SELECT EXISTS(SELECT 1 FROM gleanings WHERE sessionId = :sessionId AND status != 'discarded')")
-    suspend fun contains(sessionId: Long): Boolean
+    /**
+     * A row in any status — including the `discarded` tombstone — means the
+     * reader has already been offered this session. The tombstone is what makes
+     * an explicit discard terminal rather than resurrectable.
+     */
+    @Query("SELECT EXISTS(SELECT 1 FROM gleanings WHERE sessionId = :sessionId)")
+    suspend fun isHandled(sessionId: Long): Boolean
 
     @Query("UPDATE gleanings SET status = 'discarded' WHERE sessionId = :sessionId AND status = 'pending'")
     suspend fun discard(sessionId: Long)

@@ -28,6 +28,7 @@ abstract class EruditioDatabase : RoomDatabase() {
     abstract fun readingPositionDao(): ReadingPositionDao
     abstract fun sessionDao(): SessionDao
     abstract fun gleaningDao(): GleaningDao
+    abstract fun gleaningRecoveryDao(): GleaningRecoveryDao
     abstract fun interceptionDao(): InterceptionDao
     abstract fun ledgerDao(): LedgerDao
     abstract fun entitlementDao(): EntitlementDao
@@ -87,12 +88,19 @@ abstract class EruditioDatabase : RoomDatabase() {
             }
         }
 
-        /** v6: explicit pending/saved/discarded state replaces the blank-takeaway sentinel. */
+        /**
+         * v6: explicit pending/saved/discarded state replaces the blank-takeaway
+         * sentinel. Rows that were still in flight at v5 are the blank-takeaway
+         * ones, so the backfill must derive the status from the old encoding —
+         * a blanket 'saved' default would publish an empty hand-off into the
+         * collection and inflate every count.
+         */
         private val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL(
                     "ALTER TABLE gleanings ADD COLUMN status TEXT NOT NULL DEFAULT 'saved'",
                 )
+                db.execSQL("UPDATE gleanings SET status = 'pending' WHERE takeaway = ''")
             }
         }
 

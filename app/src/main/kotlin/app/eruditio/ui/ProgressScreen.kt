@@ -29,7 +29,7 @@ import java.util.Locale
 
 @Composable
 internal fun ProgressScreen(
-    state: EruditioViewModel.ProgressState,
+    state: ProgressState,
     modifier: Modifier,
     onOpenLibrary: () -> Unit,
 ) {
@@ -69,7 +69,7 @@ internal fun fmtMinutes(minutes: Long): String =
 
 /** The day count is primary; the seven-dot strip stays secondary. */
 @Composable
-private fun StreakHead(state: EruditioViewModel.ProgressState) {
+private fun StreakHead(state: ProgressState) {
     PaperSurface(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(

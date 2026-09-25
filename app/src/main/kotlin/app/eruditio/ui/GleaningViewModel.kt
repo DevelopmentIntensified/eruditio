@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import app.eruditio.AppContainer
 import app.eruditio.core.GleaningDraft
 import app.eruditio.core.GleaningDraftFactory
+import app.eruditio.core.GleaningHandoff
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -205,9 +206,17 @@ internal class GleaningViewModel(
         val source = sourceFor(session.textId, session.startChar, end, text) ?: run {
             updateState { it.copy(loadError = "This session has no readable source context.") }
             return
+        }        // A recovery launch (completed session, no hand-off row) materialises its
+        // row here. An already-resolved session — saved or explicitly discarded —
+        // must not be re-offered.
+        when (container.gleaningCoordinator.preparePending(sessionId, end)) {
+            GleaningHandoff.PREPARED -> updateState { it.copy(source = source) }
+            GleaningHandoff.ALREADY_HANDLED ->
+                updateState { it.copy(loadError = "This reflection was already resolved.") }
+            GleaningHandoff.UNAVAILABLE -> {
+                updateState { it.copy(loadError = "This reading session is no longer available.") }
+            }
         }
-        container.gleaningCoordinator.preparePending(sessionId, end)
-        updateState { it.copy(source = source) }
     }
 
     private fun sourceFor(
@@ -216,7 +225,13 @@ internal class GleaningViewModel(
         endChar: Long,
         text: String,
     ): GleaningSource? {
-        val source = GleaningDraftFactory.source(textId, startChar, endChar, text) ?: return null
+        val source = GleaningDraftFactory.source(
+            textId = textId,
+            startChar = startChar,
+            endChar = endChar,
+            text = text,
+            contexts = container.gleaningContexts,
+        ) ?: return null
         val meta = container.library.meta(textId)
         return GleaningSource(
             sessionId = sessionId,
@@ -226,7 +241,7 @@ internal class GleaningViewModel(
             startChar = source.startChar,
             endChar = source.endChar,
             sourceContext = source.sourceContext,
-            curatedContext = container.gleaningContexts.forSource(textId, source.sourceContext),
+            curatedContext = source.curatedContext,
         )
     }
 

@@ -66,6 +66,7 @@ import app.eruditio.EruditioApp
 import app.eruditio.R
 import app.eruditio.core.CompletedSession
 import app.eruditio.core.Groups
+import app.eruditio.core.GleaningHandoff
 import app.eruditio.core.ReaderText
 import app.eruditio.ui.theme.EruditioTheme
 import kotlinx.coroutines.FlowPreview
@@ -297,15 +298,20 @@ private fun ReadingBody(
         val end = readerText.segmentEndAfter(checkpoint)
         scope.launch {
             container.positions.save(loaded.textId, items[checkpoint].startChar)
-            val completed = container.sessions.completeSession(loaded.sessionId, end)
-            if (completed == null) {
-                container.pauseToHome.value = true
-            } else {
-                container.gleaningCoordinator.preparePending(completed.sessionId, end)
+            // ADR-0006: the hand-off row is written BEFORE the session completes,
+            // so "completed" always implies "a reflection is owed".
+            when (container.gleaningCoordinator.preparePending(loaded.sessionId, end)) {
+                GleaningHandoff.PREPARED -> {
+                    val completed = container.sessions.completeSession(loaded.sessionId, end)
+                    onLeave(completed?.sessionId)
+                }
+                GleaningHandoff.ALREADY_HANDLED -> {
+                    container.pauseToHome.value = true
+                    onLeave(null)
+                }
+                // No durable prompt means no completion: the reader stays put.
+                GleaningHandoff.UNAVAILABLE -> Unit
             }
-            // A checkpoint is a meaningful completion too: offer the same
-            // Notice → Compare → Keep flow before returning to the shell.
-            onLeave(completed?.sessionId)
         }
     }
 
@@ -434,15 +440,30 @@ private fun ReadingBody(
                 onRegisterFlush(null)
                 completing = true
                 scope.launch {
-                    val done = container.sessions.completeSession(loaded.sessionId, end)
-                    if (done != null) {
-                        val resumeStart = readerText.items[firstVisible].startChar
-                        container.positions.save(loaded.textId, resumeStart)
-                        container.gleaningCoordinator.preparePending(done.sessionId, end)
-                        onCompleted(done)
-                    } else {
-                        completing = false
-                        onRegisterFlush { saveTopLine() }
+                    // Same hand-off-first rule as the checkpoint path: a completed
+                    // session must always owe the reader a durable reflection.
+                    when (container.gleaningCoordinator.preparePending(loaded.sessionId, end)) {
+                        GleaningHandoff.PREPARED -> {
+                            val done = container.sessions.completeSession(loaded.sessionId, end)
+                            if (done == null) {
+                                completing = false
+                                onRegisterFlush { saveTopLine() }
+                                return@launch
+                            }
+                            val resumeStart = readerText.items[firstVisible].startChar
+                            container.positions.save(loaded.textId, resumeStart)
+                            onCompleted(done)
+                        }
+                        GleaningHandoff.ALREADY_HANDLED -> {
+                            completing = false
+                            onRegisterFlush { saveTopLine() }
+                        }
+                        // The prompt could not be persisted, so do not complete:
+                        // an unprompted completion is exactly what ADR-0006 forbids.
+                        GleaningHandoff.UNAVAILABLE -> {
+                            completing = false
+                            onRegisterFlush { saveTopLine() }
+                        }
                     }
                 }
             },

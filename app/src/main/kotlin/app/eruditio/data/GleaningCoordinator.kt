@@ -2,8 +2,8 @@ package app.eruditio.data
 
 import app.eruditio.core.GleaningContextSource
 import app.eruditio.core.GleaningDraftFactory
+import app.eruditio.core.GleaningHandoff
 import app.eruditio.core.GleaningStore
-import app.eruditio.core.PendingGleaningDraft
 import app.eruditio.core.SessionController
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -16,30 +16,26 @@ class GleaningCoordinator(
     private val store: GleaningStore,
     private val contexts: GleaningContextSource,
 ) {
-    suspend fun preparePending(sessionId: Long, endChar: Long): Boolean =
-        try {
-            val session = sessions.sessionFor(sessionId) ?: return false
+    suspend fun preparePending(sessionId: Long, endChar: Long): GleaningHandoff {
+        if (store.isHandled(sessionId)) return GleaningHandoff.ALREADY_HANDLED
+        return try {
+            val session = sessions.sessionFor(sessionId) ?: return GleaningHandoff.UNAVAILABLE
             val text = withContext(Dispatchers.IO) { library.text(session.textId) }
-            val material = GleaningDraftFactory.source(
+            val draft = GleaningDraftFactory.pending(
+                sessionId = session.sessionId,
                 textId = session.textId,
                 startChar = session.startChar,
                 endChar = endChar,
                 text = text,
-            ) ?: return false
-            val draft = PendingGleaningDraft(
-                sessionId = session.sessionId,
-                textId = session.textId,
-                startChar = material.startChar,
-                endChar = material.endChar,
-                sourceContext = material.sourceContext,
-                curatedContext = contexts.forSource(session.textId, material.sourceContext),
-            )
+                contexts = contexts,
+            ) ?: return GleaningHandoff.UNAVAILABLE
             store.prepare(draft)
-            true
+            GleaningHandoff.PREPARED
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
             // No source text is logged; the caller keeps the session open.
-            false
+            GleaningHandoff.UNAVAILABLE
         }
+    }
 }

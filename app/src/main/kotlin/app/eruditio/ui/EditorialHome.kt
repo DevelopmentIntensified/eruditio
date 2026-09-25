@@ -33,7 +33,7 @@ import app.eruditio.core.Gleaning
 @Composable
 internal fun EditorialHomeScreen(
     vm: EruditioViewModel,
-    state: EruditioViewModel.HomeState,
+    state: HomeState,
     modifier: Modifier,
     onOpenLibrary: () -> Unit,
     onOpenGleanings: () -> Unit,

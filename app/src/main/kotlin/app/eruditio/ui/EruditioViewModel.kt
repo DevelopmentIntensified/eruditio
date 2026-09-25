@@ -39,59 +39,6 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
 
     val texts = container.library.texts
 
-    data class HomeReviewItem(
-        val conceptId: String,
-        val cue: String?,
-        val mastery: MasteryLevel,
-    )
-
-    data class HomeState(
-        /** Due review items plus mastery challenges when the due set is empty. */
-        val due: Int = 0,
-        val recent: List<SessionRecord> = emptyList(),
-        val hasUsageAccess: Boolean = false,
-        val canDrawOverlays: Boolean = false,
-        val sessionsThisWeek: Int = 0,
-        val minutesToday: Long = 0L,
-        val resumeTextId: String? = null,
-        val reviewItems: List<HomeReviewItem> = emptyList(),
-        val reviewIsChallenge: Boolean = false,
-        val pendingGleaning: PendingGleaning? = null,
-        val recoverableGleaning: GleaningRecovery? = null,
-    )
-
-    private data class ReviewSnapshot(
-        val dueCount: Int,
-        val items: List<LedgerEntry>,
-        val isChallenge: Boolean,
-    )
-
-    data class ReviewState(
-        val current: LedgerEntry? = null,
-        val cue: String? = null,
-        val index: Int = 0,
-        val total: Int = 0,
-        /** True when the served review items are the mastery challenge. */
-        val isChallenge: Boolean = false,
-    )
-
-    data class ProgressState(
-        val textsInProgress: Int = 0,
-        val textsReadThrough: Int = 0,
-        val minutesReadingWeek: Long = 0L,
-        val minutesReadingTotal: Long = 0L,
-        val familiar: Int = 0,
-        val proficient: Int = 0,
-        val mastered: Int = 0,
-        val dueCount: Int = 0,
-        val gleaningCount: Int = 0,
-        val weekly: Int = 0,
-        val replaced: Int = 0,
-        val streak: Int = 0,
-        /** Trailing 7 local days, oldest first (ticket 19 week strip). */
-        val weekDots: List<WeekDot> = emptyList(),
-    )
-
     private val homeState = MutableStateFlow(HomeState())
     val home: StateFlow<HomeState> = homeState
 
@@ -151,16 +98,10 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         val review = reviewSnapshot()
         val savedGleanings = container.gleanings.all()
         val pendingGleaning = container.gleanings.latestPending()
-        val recoverableSession = container.sessions.recentSessions(20)
-            .firstOrNull { it.isCompleted && !container.gleanings.contains(it.sessionId) }
-        val recoverableGleaning = recoverableSession?.endChar?.let { end ->
-            GleaningRecovery(
-                sessionId = recoverableSession.sessionId,
-                textId = recoverableSession.textId,
-                startChar = recoverableSession.startChar,
-                endChar = end,
-            )
-        }
+        // Only surface a hand-off whose session actually completed; a row left by
+        // a crash between hand-off and completion must not nag on Today.
+        val pendingIsComplete = pendingGleaning?.let { container.sessions.sessionFor(it.sessionId)?.isCompleted == true }
+        val recoverableGleaning = container.gleaningRecovery.firstUnhandled()
         val gleaningCount = container.gleanings.count()
         val progress = container.progressById()
         val recent = container.sessions.recentSessions(5)
@@ -198,7 +139,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
             resumeTextId = resumeTextId,
             reviewItems = reviewItems,
             reviewIsChallenge = review.isChallenge,
-            pendingGleaning = pendingGleaning,
+            pendingGleaning = pendingGleaning?.takeIf { pendingIsComplete == true },
             recoverableGleaning = recoverableGleaning,
         )
         reviewState.value = ReviewState(

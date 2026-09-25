@@ -62,6 +62,21 @@ data class GleaningRecovery(
     val endChar: Long,
 )
 
+/**
+ * The outcome of a hand-off attempt. Modelled as a result rather than a Boolean
+ * so callers must distinguish "already resolved" (navigate away) from "could
+ * not persist" (stay put, leave the session open).
+ */
+enum class GleaningHandoff { PREPARED, ALREADY_HANDLED, UNAVAILABLE }
+
+/**
+ * Finds a completed session the reader has not yet resolved. Implemented as one
+ * join so recovery is neither bounded by a page size nor an N+1 scan.
+ */
+interface GleaningRecoverySource {
+    suspend fun firstUnhandled(): GleaningRecovery?
+}
+
 data class PendingGleaning(
     val sessionId: Long,
     val textId: String,
@@ -72,9 +87,21 @@ data class PendingGleaning(
     val createdAtMillis: Long,
 )
 
+/**
+ * Resolves a locally bundled editorial lens for a source slice.
+ *
+ * Matching is whitespace-insensitive: the corpus is hard-wrapped, so an anchor
+ * that spans a line break would otherwise silently never match.
+ */
 fun interface GleaningContextSource {
     fun forSource(textId: String, sourceContext: String): String?
 }
+
+/** Collapses runs of whitespace so wrapped anchors match the source slice. */
+fun canonicalProse(value: String): String =
+    value.replace(WHITESPACE_RUN, " ").trim()
+
+private val WHITESPACE_RUN = Regex("\\s+")
 
 data class SourceExcerpt(
     val startChar: Long,
@@ -109,20 +136,24 @@ data class GleaningSourceMaterial(
     val curatedContext: String?,
 )
 
+/**
+ * Builds a source material and its hand-off in one place, so the coordinator
+ * and the flow view model cannot drift on how a slice is derived or resolved.
+ */
 object GleaningDraftFactory {
     fun source(
         textId: String,
         startChar: Long,
         endChar: Long,
         text: String,
-        curatedContext: String? = null,
+        contexts: GleaningContextSource,
     ): GleaningSourceMaterial? {
         val excerpt = GleaningSourceBuilder.build(text, startChar, endChar) ?: return null
         return GleaningSourceMaterial(
             startChar = excerpt.startChar,
             endChar = excerpt.endChar,
             sourceContext = excerpt.text,
-            curatedContext = curatedContext,
+            curatedContext = contexts.forSource(textId, excerpt.text),
         )
     }
 
@@ -132,9 +163,9 @@ object GleaningDraftFactory {
         startChar: Long,
         endChar: Long,
         text: String,
-        curatedContext: String? = null,
+        contexts: GleaningContextSource,
     ): PendingGleaningDraft? {
-        val source = source(textId, startChar, endChar, text, curatedContext) ?: return null
+        val source = source(textId, startChar, endChar, text, contexts) ?: return null
         return PendingGleaningDraft(
             sessionId = sessionId,
             textId = textId,
@@ -152,7 +183,7 @@ interface GleaningStore {
     suspend fun pending(sessionId: Long): PendingGleaning?
     suspend fun latestPending(): PendingGleaning?
     suspend fun discard(sessionId: Long)
-    suspend fun contains(sessionId: Long): Boolean
+    suspend fun isHandled(sessionId: Long): Boolean
     suspend fun save(draft: GleaningDraft): Gleaning
     suspend fun all(): List<Gleaning>
     suspend fun count(): Int

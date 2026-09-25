@@ -2,6 +2,7 @@ package app.eruditio.data
 
 import android.app.Application
 import app.eruditio.core.GleaningContextSource
+import app.eruditio.core.canonicalProse
 import org.json.JSONArray
 
 /** Reads the small offline catalog of passage-specific editorial lenses. */
@@ -9,14 +10,18 @@ class AssetGleaningContextSource(private val app: Application) : GleaningContext
 
     private data class Entry(
         val textId: String,
-        val anchor: String,
+        val canonicalAnchor: String,
         val context: String,
     )
 
     private val entries: List<Entry> by lazy { load() }
 
-    override fun forSource(textId: String, sourceContext: String): String? =
-        entries.firstOrNull { it.textId == textId && sourceContext.contains(it.anchor) }?.context
+    override fun forSource(textId: String, sourceContext: String): String? {
+        val source = canonicalProse(sourceContext)
+        return entries
+            .firstOrNull { it.textId == textId && source.contains(it.canonicalAnchor) }
+            ?.context
+    }
 
     private fun load(): List<Entry> = try {
         val json = app.assets.open(CATALOG).bufferedReader().use { it.readText() }
@@ -26,10 +31,10 @@ class AssetGleaningContextSource(private val app: Application) : GleaningContext
                 val item = array.optJSONObject(index) ?: continue
                 val entry = Entry(
                     textId = item.optString("textId"),
-                    anchor = item.optString("anchor"),
+                    canonicalAnchor = canonicalProse(item.optString("anchor")),
                     context = item.optString("context"),
                 )
-                if (entry.textId.isNotBlank() && entry.anchor.isNotBlank() && entry.context.isNotBlank()) {
+                if (entry.textId.isNotBlank() && entry.canonicalAnchor.isNotBlank() && entry.context.isNotBlank()) {
                     add(entry)
                 }
             }

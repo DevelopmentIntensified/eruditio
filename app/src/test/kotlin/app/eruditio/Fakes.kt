@@ -10,6 +10,8 @@ import app.eruditio.core.LedgerStore
 import app.eruditio.core.ConceptSource
 import app.eruditio.core.Gleaning
 import app.eruditio.core.GleaningDraft
+import app.eruditio.core.GleaningRecovery
+import app.eruditio.core.GleaningRecoverySource
 import app.eruditio.core.GleaningStore
 import app.eruditio.core.PendingGleaning
 import app.eruditio.core.PendingGleaningDraft
@@ -144,9 +146,17 @@ class FakeGleaningStore : GleaningStore {
     private data class Row(val saved: Gleaning?, val pending: PendingGleaning?, val status: Status)
 
     private val rows = mutableMapOf<Long, Row>()
+    private val completed = mutableListOf<Long>()
     private var clock = 1_000L
 
     fun advanceClock(by: Long) { clock += by }
+
+    /** Completed sessions the reader has not resolved, oldest first. */
+    fun unhandled(): List<GleaningRecovery> = completed
+        .filterNot { rows.containsKey(it) }
+        .map { GleaningRecovery(it, "euthyphro", 0L, 5L) }
+
+    fun complete(sessionId: Long) { completed.removeAll { it == sessionId }; completed.add(sessionId) }
 
     override suspend fun prepare(draft: PendingGleaningDraft): PendingGleaning {
         val pending = PendingGleaning(
@@ -173,8 +183,7 @@ class FakeGleaningStore : GleaningStore {
         if (row.status == Status.PENDING) rows[sessionId] = row.copy(status = Status.DISCARDED)
     }
 
-    override suspend fun contains(sessionId: Long): Boolean =
-        rows[sessionId]?.status != Status.DISCARDED && rows.containsKey(sessionId)
+    override suspend fun isHandled(sessionId: Long): Boolean = rows.containsKey(sessionId)
 
     override suspend fun save(draft: GleaningDraft): Gleaning {
         val saved = Gleaning(
@@ -195,4 +204,13 @@ class FakeGleaningStore : GleaningStore {
         rows.values.filter { it.status == Status.SAVED }.map { it.saved!! }
 
     override suspend fun count(): Int = rows.values.count { it.status == Status.SAVED }
+}
+
+/**
+ * Recovery over the same rows the store owns: any status counts as handled, so
+ * a discarded tombstone is never re-offered.
+ */
+class FakeGleaningRecovery(private val store: FakeGleaningStore) : GleaningRecoverySource {
+    override suspend fun firstUnhandled(): GleaningRecovery? =
+        store.unhandled().firstOrNull()
 }

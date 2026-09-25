@@ -21,7 +21,7 @@ import app.eruditio.core.RecallGrade
 @Composable
 internal fun ReviewScreen(
     vm: EruditioViewModel,
-    state: EruditioViewModel.ReviewState,
+    state: ReviewState,
     modifier: Modifier,
 ) {
     Column(

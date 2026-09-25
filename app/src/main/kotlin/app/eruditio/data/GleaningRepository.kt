@@ -28,7 +28,7 @@ class RoomGleaningStore(
         dao.discard(sessionId)
     }
 
-    override suspend fun contains(sessionId: Long): Boolean = dao.contains(sessionId)
+    override suspend fun isHandled(sessionId: Long): Boolean = dao.isHandled(sessionId)
 
     override suspend fun save(draft: GleaningDraft): Gleaning {
         val entity = draft.toEntity(clock.epochMillis)

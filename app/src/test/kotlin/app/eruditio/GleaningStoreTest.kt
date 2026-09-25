@@ -13,6 +13,7 @@ import org.junit.Test
 class GleaningStoreTest {
 
     private val store = FakeGleaningStore()
+    private val recovery = FakeGleaningRecovery(store)
 
     private fun pending(sessionId: Long = 1L) = PendingGleaningDraft(
         sessionId = sessionId,
@@ -39,7 +40,7 @@ class GleaningStoreTest {
 
         assertEquals(1L, store.pending(1L)?.sessionId)
         assertEquals(1L, store.latestPending()?.sessionId)
-        assertTrue(store.contains(1L))
+        assertTrue(store.isHandled(1L))
         assertTrue(store.all().isEmpty())
         assertEquals(0, store.count())
     }
@@ -59,12 +60,34 @@ class GleaningStoreTest {
     @Test
     fun `explicit discard is terminal and never resurrects`() = runTest {
         store.prepare(pending())
+        store.complete(1L)
         store.discard(1L)
 
         assertNull(store.pending(1L))
         assertNull(store.latestPending())
-        assertFalse(store.contains(1L))
         assertTrue(store.all().isEmpty())
+        // The tombstone is what makes it terminal: the recovery scan, which is
+        // how Today re-offers an unresolved completion, must skip it.
+        assertTrue(store.isHandled(1L))
+        assertNull("a discarded session must not be recoverable", recovery.firstUnhandled())
+    }
+
+    @Test
+    fun `a completed session with no row is recoverable`() = runTest {
+        store.complete(7L)
+        store.complete(8L)
+
+        assertEquals(7L, recovery.firstUnhandled()?.sessionId)
+    }
+
+    @Test
+    fun `recovering a session then discarding it clears the queue`() = runTest {
+        store.complete(7L)
+        val recovered = recovery.firstUnhandled()!!
+        store.prepare(pending(recovered.sessionId))
+        store.discard(recovered.sessionId)
+
+        assertNull(recovery.firstUnhandled())
     }
 
     @Test
@@ -75,5 +98,16 @@ class GleaningStoreTest {
 
         assertEquals(2L, store.latestPending()?.sessionId)
         assertEquals(listOf(1L), store.all().map { it.sessionId })
+    }
+
+    @Test
+    fun `saving a recovered session twice keeps one row`() = runTest {
+        store.prepare(pending(sessionId = 3L))
+        store.save(saved(sessionId = 3L, takeaway = "first"))
+        store.save(saved(sessionId = 3L, takeaway = "second"))
+
+        assertEquals(1, store.count())
+        assertEquals("second", store.all().single().takeaway)
+        assertFalse(store.isHandled(99L))
     }
 }
