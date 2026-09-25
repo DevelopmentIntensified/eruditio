@@ -4,6 +4,6 @@ A reading session's primary output is a **gleaning**: the reader's own takeaway 
 
 ## Consequences
 
-- The normal completion flow can create a source-linked gleaning without grading recall.
+- The normal completion flow can create a source-linked gleaning without grading recall; the reader may explicitly discard the reflection.
 - Review infrastructure may remain dormant until eligible memorizable content exists.
 - Future review surfaces must state what is being memorized and why.
