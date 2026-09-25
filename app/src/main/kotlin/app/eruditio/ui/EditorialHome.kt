@@ -28,7 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 
-/** Variant A: an editorial reading desk with Continue as the first action. */
+/** Variant A: an editorial reading desk with Resume as the first action. */
 @Composable
 internal fun EditorialHomeScreen(
     vm: EruditioViewModel,
@@ -43,11 +43,21 @@ internal fun EditorialHomeScreen(
     val gateError by vm.gateError.collectAsState()
     val progressById by vm.progressById.collectAsState()
     val unstarted = vm.texts.filter { isUnstarted(progressById[it.id] ?: 0) }
-    val continueId = state.recent.firstOrNull()?.textId
+    val inProgress = vm.texts.filter {
+        val percent = progressById[it.id] ?: 0
+        isStarted(percent) && !isReadThrough(percent)
+    }
+    val resumeText = state.resumeTextId?.let { id -> vm.texts.firstOrNull { it.id == id } }
+    val continueId = resumeText?.id?.takeIf { !isReadThrough(progressById[it] ?: 0) }
+        ?: inProgress.firstOrNull()?.id
         ?: unstarted.firstOrNull()?.id
         ?: vm.texts.firstOrNull()?.id
     val continueText = vm.texts.firstOrNull { it.id == continueId }
     val continuePercent = progressById[continueId] ?: 0
+    val shelf = (unstarted + inProgress)
+        .distinctBy { it.id }
+        .filter { it.id != continueId }
+        .take(3)
 
     Column(
         modifier.verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 20.dp),
@@ -75,10 +85,10 @@ internal fun EditorialHomeScreen(
         }
 
         if (continueText != null) {
-            PaperSectionHeader("Continue", detail = if (continuePercent > 0) "$continuePercent% read" else "new session")
+            PaperSectionHeader("Resume session", detail = if (continuePercent > 0) "$continuePercent% read" else "new session")
             PaperSurface(Modifier.fillMaxWidth()) {
                 Text(
-                    if (continuePercent > 0) "CONTINUE / RESUME POINT" else "BEGIN / NEW SESSION",
+                    if (continuePercent > 0) "RESUME / LAST POSITION" else "BEGIN / NEW SESSION",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -95,26 +105,62 @@ internal fun EditorialHomeScreen(
                 Button(
                     onClick = { vm.startReading(continueText.id) },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text(if (continuePercent > 0) "Continue session →" else "Start reading →") }
+                ) { Text(if (continuePercent > 0) "Resume session →" else "Start reading →") }
                 TextButton(
                     onClick = onOpenLibrary,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Replace text") }
+                ) { Text("Choose another text") }
             }
         }
 
-        PaperSectionHeader("Review queue", detail = if (state.due > 0) "due today" else "clear")
+        PaperSectionHeader(
+            if (state.reviewIsChallenge) "Mastery challenge" else "Review queue",
+            detail = if (state.due > 0) "${state.due} return points" else "clear",
+        )
         PaperSurface(Modifier.fillMaxWidth()) {
             if (state.due > 0) {
                 Text(
-                    "${state.due} ${if (state.due == 1) "card" else "cards"}",
+                    if (state.reviewIsChallenge) "Nothing due. Keep the material honest." else "${state.due} return points",
                     style = MaterialTheme.typography.headlineMedium,
                 )
                 Text(
-                    "A small return keeps the reading alive.",
+                    if (state.reviewIsChallenge) {
+                        "Aging material is ready to surface before it disappears."
+                    } else {
+                        "A small return keeps the reading alive."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                state.reviewItems.forEach { item ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Text("•", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.tertiary)
+                        Column(Modifier.weight(1f)) {
+                            Text(vm.titleOfConcept(item.conceptId), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                item.cue ?: "Return point",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                item.mastery.name.lowercase(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                if (state.due > state.reviewItems.size) {
+                    Text(
+                        "${state.due - state.reviewItems.size} more return points",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
                 Button(onClick = onReview, modifier = Modifier.fillMaxWidth()) { Text("Begin review →") }
             } else {
@@ -127,26 +173,28 @@ internal fun EditorialHomeScreen(
             }
         }
 
-        PaperSectionHeader(
-            if (state.recent.isEmpty()) "Begin here" else "Recent sessions",
-            detail = if (state.recent.isEmpty()) "from the shelf" else "resume any time",
-        )
-        if (state.recent.isEmpty()) {
-            val suggestions = unstarted.filter { it.id != continueId }
-            if (suggestions.isEmpty()) {
-                Text(
-                    "All texts have progress — choose a classic from the Library.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
-            } else {
-                suggestions.take(3).forEach { text ->
-                    HomeTextRow(text.title, text.author, "start") { vm.startReading(text.id) }
-                }
-            }
+        PaperSectionHeader("From the shelf", detail = "${vm.texts.size} bundled")
+        if (shelf.isEmpty()) {
+            Text(
+                "Every text has progress — choose a classic from the Library.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
         } else {
-            state.recent.forEach { session ->
+            shelf.forEach { text ->
+                val percent = progressById[text.id] ?: 0
+                HomeTextRow(
+                    title = text.title,
+                    meta = "${text.author} · ${if (percent > 0) "$percent% read" else "not started"}",
+                    action = if (percent > 0) "resume" else "start",
+                ) { vm.startReading(text.id) }
+            }
+        }
+
+        if (state.recent.isNotEmpty()) {
+            PaperSectionHeader("Recent sessions", detail = "last ${state.recent.size}")
+            state.recent.take(3).forEach { session ->
                 HomeTextRow(vm.titleOf(session.textId), "last session", "resume") {
                     vm.startReading(session.textId)
                 }

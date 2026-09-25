@@ -145,6 +145,10 @@ class SessionController(
     /** The pause screen's default text: what the user read last. */
     suspend fun resumeTextId(): String? = positionStore.lastReadTextId()
 
+    /** Effective mastery for a ledger entry at query time, including decay. */
+    fun masteryOf(entry: LedgerEntry): MasteryLevel =
+        scheduler.effectiveMastery(entry, clock.epochDay)
+
     /** The session record behind a reader, as a core value — never an entity. */
     suspend fun sessionFor(sessionId: Long): SessionRecord? = sessionLog.get(sessionId)
 

@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.eruditio.AppContainer
 import app.eruditio.core.Entitlement
 import app.eruditio.core.LedgerEntry
+import app.eruditio.core.MasteryLevel
 import app.eruditio.core.RecallGrade
 import app.eruditio.core.SessionRecord
 import app.eruditio.core.SessionStart
@@ -32,13 +33,23 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
 
     val texts = container.library.texts
 
+    data class HomeReviewItem(
+        val conceptId: String,
+        val cue: String?,
+        val mastery: MasteryLevel,
+    )
+
     data class HomeState(
+        /** Due cards plus mastery challenges when the due set is empty. */
         val due: Int = 0,
         val recent: List<SessionRecord> = emptyList(),
         val hasUsageAccess: Boolean = false,
         val canDrawOverlays: Boolean = false,
         val sessionsThisWeek: Int = 0,
         val minutesToday: Long = 0L,
+        val resumeTextId: String? = null,
+        val reviewItems: List<HomeReviewItem> = emptyList(),
+        val reviewIsChallenge: Boolean = false,
     )
 
     data class ReviewState(
@@ -112,13 +123,29 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
 
     fun refresh() {
         viewModelScope.launch {
+            val dueCards = container.sessions.dueToday()
+            val challengeCards = if (dueCards.isEmpty()) {
+                container.sessions.masteryChallengeToday()
+            } else {
+                emptyList()
+            }
+            val servedHomeCards = dueCards.ifEmpty { challengeCards }
             homeState.value = HomeState(
-                due = container.sessions.dueToday().size,
+                due = servedHomeCards.size,
                 recent = container.sessions.recentSessions(5),
                 hasUsageAccess = container.hasUsageAccess,
                 canDrawOverlays = container.canDrawOverlays,
                 sessionsThisWeek = container.sessions.weeklySessions(),
                 minutesToday = container.sessions.minutesToday(),
+                resumeTextId = container.sessions.resumeTextId(),
+                reviewItems = servedHomeCards.take(3).map { entry ->
+                    HomeReviewItem(
+                        conceptId = entry.conceptId,
+                        cue = container.concepts.cueFor(entry.conceptId),
+                        mastery = container.sessions.masteryOf(entry),
+                    )
+                },
+                reviewIsChallenge = dueCards.isEmpty() && servedHomeCards.isNotEmpty(),
             )
             textProgress.value = container.progressById()
             refreshReview()
