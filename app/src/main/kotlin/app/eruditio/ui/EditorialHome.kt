@@ -47,16 +47,15 @@ internal fun EditorialHomeScreen(
         val percent = progressById[it.id] ?: 0
         isStarted(percent) && !isReadThrough(percent)
     }
-    val resumeText = state.resumeTextId?.let { id -> vm.texts.firstOrNull { it.id == id } }
-    val continueId = resumeText?.id?.takeIf { !isReadThrough(progressById[it] ?: 0) }
+    val resumeMeta = state.resumeTextId?.let { id -> vm.texts.firstOrNull { it.id == id } }
+    val resumeId = resumeMeta?.id?.takeIf { !isReadThrough(progressById[it] ?: 0) }
         ?: inProgress.firstOrNull()?.id
         ?: unstarted.firstOrNull()?.id
         ?: vm.texts.firstOrNull()?.id
-    val continueText = vm.texts.firstOrNull { it.id == continueId }
-    val continuePercent = progressById[continueId] ?: 0
+    val resumePercent = progressById[resumeId] ?: 0
     val shelf = (unstarted + inProgress)
         .distinctBy { it.id }
-        .filter { it.id != continueId }
+        .filter { it.id != resumeId }
         .take(3)
 
     Column(
@@ -84,28 +83,28 @@ internal fun EditorialHomeScreen(
             )
         }
 
-        if (continueText != null) {
-            PaperSectionHeader("Resume session", detail = if (continuePercent > 0) "$continuePercent% read" else "new session")
+        if (resumeMeta != null) {
+            PaperSectionHeader("Resume session", detail = if (resumePercent > 0) "$resumePercent% read" else "new session")
             PaperSurface(Modifier.fillMaxWidth()) {
                 Text(
-                    if (continuePercent > 0) "RESUME / LAST POSITION" else "BEGIN / NEW SESSION",
+                    if (resumePercent > 0) "RESUME / READING ANCHOR" else "BEGIN / NEW SESSION",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(8.dp))
-                Text(continueText.title, style = MaterialTheme.typography.headlineSmall)
+                Text(resumeMeta.title, style = MaterialTheme.typography.headlineSmall)
                 Text(
-                    continueText.author,
+                    resumeMeta.author,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(16.dp))
-                PaperProgress(continuePercent, Modifier.fillMaxWidth())
+                PaperProgress(resumePercent, Modifier.fillMaxWidth())
                 Spacer(Modifier.height(14.dp))
                 Button(
-                    onClick = { vm.startReading(continueText.id) },
+                    onClick = { vm.startReading(resumeMeta.id) },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text(if (continuePercent > 0) "Resume session →" else "Start reading →") }
+                ) { Text(if (resumePercent > 0) "Resume session →" else "Start reading →") }
                 TextButton(
                     onClick = onOpenLibrary,
                     modifier = Modifier.fillMaxWidth(),
@@ -115,12 +114,12 @@ internal fun EditorialHomeScreen(
 
         PaperSectionHeader(
             if (state.reviewIsChallenge) "Mastery challenge" else "Review queue",
-            detail = if (state.due > 0) "${state.due} return points" else "clear",
+            detail = if (state.due > 0) "${state.due} review items" else "clear",
         )
         PaperSurface(Modifier.fillMaxWidth()) {
             if (state.due > 0) {
                 Text(
-                    if (state.reviewIsChallenge) "Nothing due. Keep the material honest." else "${state.due} return points",
+                    if (state.reviewIsChallenge) "Nothing due. Keep the material honest." else "${state.due} review items",
                     style = MaterialTheme.typography.headlineMedium,
                 )
                 Text(
@@ -155,7 +154,7 @@ internal fun EditorialHomeScreen(
                 }
                 if (state.due > state.reviewItems.size) {
                     Text(
-                        "${state.due - state.reviewItems.size} more return points",
+                        "${state.due - state.reviewItems.size} more review items",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp),
@@ -166,7 +165,7 @@ internal fun EditorialHomeScreen(
             } else {
                 Text("Nothing due today.", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Read a segment and new return points will appear tomorrow.",
+                    "Read a segment and new review items will appear tomorrow.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -195,7 +194,7 @@ internal fun EditorialHomeScreen(
         if (state.recent.isNotEmpty()) {
             PaperSectionHeader("Recent sessions", detail = "last ${state.recent.size}")
             state.recent.take(3).forEach { session ->
-                HomeTextRow(vm.titleOf(session.textId), "last session", "resume") {
+                HomeTextRow(vm.titleOf(session.textId), "completed session", "open again") {
                     vm.startReading(session.textId)
                 }
             }

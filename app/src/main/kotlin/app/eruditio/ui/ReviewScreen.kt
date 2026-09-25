@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.eruditio.core.RecallGrade
 
-/** Review is a return point, not a score screen. */
+/** Review items are returns, not scores. */
 @Composable
 internal fun ReviewScreen(
     vm: EruditioViewModel,
@@ -29,29 +29,29 @@ internal fun ReviewScreen(
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         PaperHeader(
-            eyebrow = "Review / return points",
+            eyebrow = "Review / spaced repetition",
             title = "Return to what you learned.",
             subtitle = "Recall before you grade. Mastery stays honest.",
         )
         Spacer(Modifier.height(16.dp))
-        val card = state.current
-        if (card == null) {
-            Text("Nothing due. Read a segment from the Library and new cards arrive tomorrow.")
+        val reviewItem = state.current
+        if (reviewItem == null) {
+            Text("Nothing due. Read a segment from the Library and new review items arrive tomorrow.")
         } else {
             Text(
                 if (state.isChallenge) "Mastery challenge · learned material resurfacing"
-                else "Card ${state.index + 1} of ${state.total}",
+                else "Review item ${state.index + 1} of ${state.total}",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             PaperSurface(Modifier.fillMaxWidth()) {
                 Text(
-                    vm.titleOfConcept(card.conceptId),
+                    vm.titleOfConcept(reviewItem.conceptId),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(8.dp))
-                Text(state.cue ?: card.conceptId, style = MaterialTheme.typography.bodyLarge)
+                Text(state.cue ?: reviewItem.conceptId, style = MaterialTheme.typography.bodyLarge)
                 Text(
                     "Recall it before you grade.",
                     style = MaterialTheme.typography.labelSmall,

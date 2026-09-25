@@ -728,7 +728,7 @@ private fun CompletedBody(container: AppContainer, s: CompletedView) {
     val context = LocalContext.current
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Session complete", style = MaterialTheme.typography.headlineMedium)
-        Text("${s.title} · +${s.completed.newConcepts} review cards")
+        Text("${s.title} · +${s.completed.newConcepts} review items")
         s.next?.let { next ->
             val scope = rememberCoroutineScope()
             OutlinedButton(

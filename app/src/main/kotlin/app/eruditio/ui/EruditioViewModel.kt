@@ -17,6 +17,9 @@ import app.eruditio.core.WeekDot
 import app.eruditio.intercept.TargetApp
 import app.eruditio.intercept.TargetApps
 import app.eruditio.ui.theme.Palette
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -40,7 +43,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
     )
 
     data class HomeState(
-        /** Due cards plus mastery challenges when the due set is empty. */
+        /** Due review items plus mastery challenges when the due set is empty. */
         val due: Int = 0,
         val recent: List<SessionRecord> = emptyList(),
         val hasUsageAccess: Boolean = false,
@@ -52,12 +55,18 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         val reviewIsChallenge: Boolean = false,
     )
 
+    private data class ReviewSnapshot(
+        val dueCount: Int,
+        val items: List<LedgerEntry>,
+        val isChallenge: Boolean,
+    )
+
     data class ReviewState(
         val current: LedgerEntry? = null,
         val cue: String? = null,
         val index: Int = 0,
         val total: Int = 0,
-        /** True when the served cards are the mastery challenge (due set empty). */
+        /** True when the served review items are the mastery challenge. */
         val isChallenge: Boolean = false,
     )
 
@@ -121,36 +130,73 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
     private val textProgress = MutableStateFlow<Map<String, Int>>(emptyMap())
     val progressById: StateFlow<Map<String, Int>> = textProgress
 
+    private var refreshJob: Job? = null
+
     fun refresh() {
-        viewModelScope.launch {
-            val dueCards = container.sessions.dueToday()
-            val challengeCards = if (dueCards.isEmpty()) {
-                container.sessions.masteryChallengeToday()
-            } else {
-                emptyList()
-            }
-            val servedHomeCards = dueCards.ifEmpty { challengeCards }
-            homeState.value = HomeState(
-                due = servedHomeCards.size,
-                recent = container.sessions.recentSessions(5),
-                hasUsageAccess = container.hasUsageAccess,
-                canDrawOverlays = container.canDrawOverlays,
-                sessionsThisWeek = container.sessions.weeklySessions(),
-                minutesToday = container.sessions.minutesToday(),
-                resumeTextId = container.sessions.resumeTextId(),
-                reviewItems = servedHomeCards.take(3).map { entry ->
-                    HomeReviewItem(
-                        conceptId = entry.conceptId,
-                        cue = container.concepts.cueFor(entry.conceptId),
-                        mastery = container.sessions.masteryOf(entry),
-                    )
-                },
-                reviewIsChallenge = dueCards.isEmpty() && servedHomeCards.isNotEmpty(),
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch { refreshOnce() }
+    }
+
+    /** One ordered snapshot; an older refresh cannot publish after a newer one. */
+    private suspend fun refreshOnce() {
+        val review = reviewSnapshot()
+        val progress = container.progressById()
+        val recent = container.sessions.recentSessions(5)
+        val sessionsThisWeek = container.sessions.weeklySessions()
+        val minutesToday = container.sessions.minutesToday()
+        val resumeTextId = container.sessions.resumeTextId()
+        val mastery = container.sessions.masteryCounts()
+        val (weekMinutes, totalMinutes) = container.sessions.readingMinutes()
+        val textsWithProgress = texts.count { isStarted(progress[it.id] ?: 0) }
+        val readThrough = texts.count { isReadThrough(progress[it.id] ?: 0) }
+        val reviewItems = review.items.take(3).map { entry ->
+            HomeReviewItem(
+                conceptId = entry.conceptId,
+                cue = container.concepts.cueFor(entry.conceptId),
+                mastery = container.sessions.masteryOf(entry),
             )
-            textProgress.value = container.progressById()
-            refreshReview()
-            refreshProgress()
         }
+        val head = review.items.firstOrNull()
+        val headCue = head?.let { container.concepts.cueFor(it.conceptId) }
+        val weekly = container.sessions.weeklyInterceptions()
+        val replaced = container.sessions.weeklyReplaced()
+        val streak = container.sessions.currentStreak()
+        val weekDots = container.sessions.weekDots()
+        currentCoroutineContext().ensureActive()
+
+        textProgress.value = progress
+        homeState.value = HomeState(
+            due = review.items.size,
+            recent = recent,
+            hasUsageAccess = container.hasUsageAccess,
+            canDrawOverlays = container.canDrawOverlays,
+            sessionsThisWeek = sessionsThisWeek,
+            minutesToday = minutesToday,
+            resumeTextId = resumeTextId,
+            reviewItems = reviewItems,
+            reviewIsChallenge = review.isChallenge,
+        )
+        reviewState.value = ReviewState(
+            current = head,
+            cue = headCue,
+            index = 0,
+            total = review.items.size,
+            isChallenge = review.isChallenge,
+        )
+        progressState.value = ProgressState(
+            textsInProgress = textsWithProgress,
+            textsReadThrough = readThrough,
+            minutesReadingWeek = weekMinutes,
+            minutesReadingTotal = totalMinutes,
+            familiar = mastery.familiar,
+            proficient = mastery.proficient,
+            mastered = mastery.mastered,
+            dueCount = review.dueCount,
+            weekly = weekly,
+            replaced = replaced,
+            streak = streak,
+            weekDots = weekDots,
+        )
     }
 
     /** Billing flow; debug builds bypass the gate entirely. */
@@ -168,51 +214,15 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    /** Review-tab serving rule (spec story 14): due cards first; when the due
-     *  set is empty, learned-but-aging material resurfaces as the mastery
-     *  challenge instead of leaving the tab empty. One home for the rule. */
-    private suspend fun servedReviewCards(): Pair<List<LedgerEntry>, Boolean> {
+    /** Review-tab serving rule: due items first; otherwise surface a challenge. */
+    private suspend fun reviewSnapshot(): ReviewSnapshot {
         val due = container.sessions.dueToday()
-        val cards = due.ifEmpty { container.sessions.masteryChallengeToday() }
-        return cards to (due.isEmpty() && cards.isNotEmpty())
-    }
-
-    private fun refreshReview() {
-        viewModelScope.launch {
-            val (cards, isChallenge) = servedReviewCards()
-            val head = cards.firstOrNull()
-            reviewState.value = ReviewState(
-                current = head,
-                cue = head?.let { container.concepts.cueFor(it.conceptId) },
-                index = 0,
-                total = cards.size,
-                isChallenge = isChallenge,
-            )
-        }
-    }
-
-    private fun refreshProgress() {
-        viewModelScope.launch {
-            val mastery = container.sessions.masteryCounts()
-            val textsWithProgress = texts.count { isStarted(progressById.value[it.id] ?: 0) }
-            val readThrough = texts.count { isReadThrough(progressById.value[it.id] ?: 0) }
-            // readingMinutes() returns MINUTES (the seam divides ms itself).
-            val (weekMinutes, totalMinutes) = container.sessions.readingMinutes()
-            progressState.value = ProgressState(
-                textsInProgress = textsWithProgress,
-                textsReadThrough = readThrough,
-                minutesReadingWeek = weekMinutes,
-                minutesReadingTotal = totalMinutes,
-                familiar = mastery.familiar,
-                proficient = mastery.proficient,
-                mastered = mastery.mastered,
-                dueCount = container.sessions.dueToday().size,
-                weekly = container.sessions.weeklyInterceptions(),
-                replaced = container.sessions.weeklyReplaced(),
-                streak = container.sessions.currentStreak(),
-                weekDots = container.sessions.weekDots(),
-            )
-        }
+        val items = due.ifEmpty { container.sessions.masteryChallengeToday() }
+        return ReviewSnapshot(
+            dueCount = due.size,
+            items = items,
+            isChallenge = due.isEmpty() && items.isNotEmpty(),
+        )
     }
 
     fun titleOf(textId: String): String = container.library.meta(textId)?.title ?: textId
@@ -236,17 +246,18 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun grade(grade: RecallGrade) {
+        refreshJob?.cancel()
         viewModelScope.launch {
             val current = reviewState.value.current ?: return@launch
             container.sessions.gradeConcept(current.conceptId, grade)
-            val (cards, isChallenge) = servedReviewCards()
-            val head = cards.firstOrNull()
+            val snapshot = reviewSnapshot()
+            val head = snapshot.items.firstOrNull()
             reviewState.value = ReviewState(
                 current = head,
                 cue = head?.let { container.concepts.cueFor(it.conceptId) },
                 index = reviewState.value.index + 1,
-                total = reviewState.value.total,
-                isChallenge = isChallenge,
+                total = snapshot.items.size,
+                isChallenge = snapshot.isChallenge,
             )
         }
     }

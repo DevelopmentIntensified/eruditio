@@ -99,11 +99,11 @@ internal fun SettingsScreen(vm: EruditioViewModel, modifier: Modifier) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Reading rail", style = MaterialTheme.typography.bodyLarge)
+                    Text("Margin rail", style = MaterialTheme.typography.bodyLarge)
                     Switch(checked = railEnabled, onCheckedChange = vm::setRailEnabled)
                 }
                 Text(
-                    "A slim position rail in the reader: tap or drag to jump, checkpoint ticks included.",
+                    "A slim margin rail in the reader: tap or drag to jump, checkpoint ticks included.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
