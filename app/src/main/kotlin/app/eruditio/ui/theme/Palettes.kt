@@ -119,5 +119,10 @@ private fun schemeOf(palette: Palette): ColorScheme {
 
 @Composable
 fun EruditioTheme(palette: Palette, content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = schemeOf(palette), content = content)
+    MaterialTheme(
+        colorScheme = schemeOf(palette),
+        typography = EruditioTypography,
+        shapes = EruditioShapes,
+        content = content,
+    )
 }
