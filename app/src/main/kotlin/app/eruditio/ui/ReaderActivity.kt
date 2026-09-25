@@ -106,9 +106,11 @@ class ReaderActivity : androidx.activity.ComponentActivity() {
      * With a shell beneath (in-app sessions), plain finish() returns to it and
      * App.kt consumes pauseToHome.
      */
-    internal fun leaveAtCheckpoint() {
+    internal fun leaveAtCheckpoint(gleaningSessionId: Long? = null) {
         flushPosition = null
-        if (isTaskRoot) {
+        if (gleaningSessionId != null) {
+            startActivity(GleaningActivity.intent(this, gleaningSessionId))
+        } else if (isTaskRoot) {
             startActivity(
                 Intent(this, MainActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
@@ -208,7 +210,7 @@ private fun ReaderScreen(container: AppContainer, sessionId: Long) {
             container,
             loaded.value!!,
             onRegisterFlush = { flush -> activity?.registerFlush(flush) },
-            onLeave = { activity?.leaveAtCheckpoint() },
+            onLeave = { sessionId -> activity?.leaveAtCheckpoint(sessionId) },
         ) { completed.value = it }
         else -> Column(Modifier.fillMaxSize().padding(24.dp)) { Text("Loading…") }
     }
@@ -220,7 +222,7 @@ private fun ReadingBody(
     container: AppContainer,
     loaded: Loaded,
     onRegisterFlush: (flush: (() -> Unit)?) -> Unit,
-    onLeave: () -> Unit,
+    onLeave: (Long?) -> Unit,
     onCompleted: (CompletedView) -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -292,8 +294,7 @@ private fun ReadingBody(
 
     // Pause at a checkpoint: the session completes AT that checkpoint (the next
     // one bounds the segment), the resume point is the checkpoint line itself,
-    // and the activity finishes without the completion screen — the user lands
-    // back on the main app, which Home/Today consumes (see App.kt).
+    // and the gleaning flow takes over before the reader finishes.
     fun pauseAtCheckpoint(checkpoint: Int) {
         // Hardening: cancel the pending debounced save and suppress the
         // pause-time flush synchronously, so neither can overwrite the
@@ -303,10 +304,11 @@ private fun ReadingBody(
         val end = readerText.segmentEndAfter(checkpoint)
         scope.launch {
             container.positions.save(loaded.textId, items[checkpoint].startChar)
-            container.sessions.completeSession(loaded.sessionId, end)
-            // Land on Home/Today when the shell returns (consumed in App.kt).
-            container.pauseToHome.value = true
-            onLeave()
+            val completed = container.sessions.completeSession(loaded.sessionId, end)
+            if (completed == null) container.pauseToHome.value = true
+            // A checkpoint is a meaningful completion too: offer the same
+            // Notice → Compare → Keep flow before returning to the shell.
+            onLeave(completed?.sessionId)
         }
     }
 
@@ -728,7 +730,13 @@ private fun CompletedBody(container: AppContainer, s: CompletedView) {
     val context = LocalContext.current
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Session complete", style = MaterialTheme.typography.headlineMedium)
-        Text("${s.title} · +${s.completed.newConcepts} review items")
+        Text("${s.title} · ready to glean")
+        Button(
+            onClick = {
+                context.startActivity(GleaningActivity.intent(context, s.completed.sessionId))
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Glean this session →") }
         s.next?.let { next ->
             val scope = rememberCoroutineScope()
             OutlinedButton(

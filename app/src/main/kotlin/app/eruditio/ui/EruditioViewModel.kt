@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.eruditio.AppContainer
 import app.eruditio.core.Entitlement
+import app.eruditio.core.Gleaning
 import app.eruditio.core.LedgerEntry
 import app.eruditio.core.MasteryLevel
 import app.eruditio.core.RecallGrade
@@ -79,6 +80,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         val proficient: Int = 0,
         val mastered: Int = 0,
         val dueCount: Int = 0,
+        val gleaningCount: Int = 0,
         val weekly: Int = 0,
         val replaced: Int = 0,
         val streak: Int = 0,
@@ -124,6 +126,9 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
     private val reviewState = MutableStateFlow(ReviewState())
     val review: StateFlow<ReviewState> = reviewState
 
+    private val gleaningState = MutableStateFlow<List<Gleaning>>(emptyList())
+    val gleanings: StateFlow<List<Gleaning>> = gleaningState
+
     private val progressState = MutableStateFlow(ProgressState())
     val progress: StateFlow<ProgressState> = progressState
 
@@ -140,6 +145,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
     /** One ordered snapshot; an older refresh cannot publish after a newer one. */
     private suspend fun refreshOnce() {
         val review = reviewSnapshot()
+        val savedGleanings = container.gleanings.recent(50)
         val progress = container.progressById()
         val recent = container.sessions.recentSessions(5)
         val sessionsThisWeek = container.sessions.weeklySessions()
@@ -165,6 +171,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
         currentCoroutineContext().ensureActive()
 
         textProgress.value = progress
+        gleaningState.value = savedGleanings
         homeState.value = HomeState(
             due = review.items.size,
             recent = recent,
@@ -192,6 +199,7 @@ class EruditioViewModel(private val container: AppContainer) : ViewModel() {
             proficient = mastery.proficient,
             mastered = mastery.mastered,
             dueCount = review.dueCount,
+            gleaningCount = savedGleanings.size,
             weekly = weekly,
             replaced = replaced,
             streak = streak,

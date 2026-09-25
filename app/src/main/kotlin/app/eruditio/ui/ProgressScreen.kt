@@ -40,12 +40,11 @@ internal fun ProgressScreen(
         PaperHeader(
             eyebrow = "Progress / return",
             title = "A quiet record of return.",
-            subtitle = "Mastery first. Streak as habit, never score.",
+            subtitle = "Reading first. Mastery only when there is something to memorize.",
         )
-        PaperSectionHeader("Mastery")
+        PaperSectionHeader("Gleanings")
         PaperSurface(Modifier.fillMaxWidth()) {
-            Text("familiar ${state.familiar} · proficient ${state.proficient} · mastered ${state.mastered}")
-            Text("Reviews due: ${state.dueCount}")
+            Text("${state.gleaningCount} ideas kept", style = MaterialTheme.typography.headlineMedium)
             Text("Texts started: ${state.textsInProgress} · read through: ${state.textsReadThrough}")
         }
         PaperSectionHeader("This week")

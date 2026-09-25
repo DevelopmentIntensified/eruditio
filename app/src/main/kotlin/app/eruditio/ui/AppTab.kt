@@ -4,7 +4,7 @@ package app.eruditio.ui
 internal enum class AppTab(val glyph: String, val label: String) {
     TODAY("⌂", "Today"),
     LIBRARY("☰", "Library"),
-    REVIEW("↺", "Review"),
+    GLEANINGS("✦", "Gleanings"),
     PROGRESS("◉", "Progress"),
     SETTINGS("⚙", "Settings"),
 }

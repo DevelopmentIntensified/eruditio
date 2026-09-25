@@ -49,7 +49,7 @@ fun App(vm: EruditioViewModel) {
             }
         }
         val homeState by vm.home.collectAsState()
-        val reviewState by vm.review.collectAsState()
+        val gleanings by vm.gleanings.collectAsState()
         val progressState by vm.progress.collectAsState()
 
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -60,10 +60,15 @@ fun App(vm: EruditioViewModel) {
                         homeState,
                         Modifier.fillMaxSize(),
                         onOpenLibrary = { tabIndex = AppTab.LIBRARY.ordinal },
-                        onReview = { tabIndex = AppTab.REVIEW.ordinal },
+                        onOpenGleanings = { tabIndex = AppTab.GLEANINGS.ordinal },
+                        gleanings = gleanings,
                     )
                     AppTab.LIBRARY -> LibraryScreen(vm, Modifier.fillMaxSize())
-                    AppTab.REVIEW -> ReviewScreen(vm, reviewState, Modifier.fillMaxSize())
+                    AppTab.GLEANINGS -> GleaningsScreen(
+                        gleanings = gleanings,
+                        modifier = Modifier.fillMaxSize(),
+                        titleOf = vm::titleOf,
+                    )
                     AppTab.PROGRESS -> ProgressScreen(
                         progressState,
                         Modifier.fillMaxSize(),

@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import app.eruditio.core.Gleaning
 
 /** Variant A: an editorial reading desk with Resume as the first action. */
 @Composable
@@ -35,7 +36,8 @@ internal fun EditorialHomeScreen(
     state: EruditioViewModel.HomeState,
     modifier: Modifier,
     onOpenLibrary: () -> Unit,
-    onReview: () -> Unit,
+    onOpenGleanings: () -> Unit,
+    gleanings: List<Gleaning>,
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -116,62 +118,38 @@ internal fun EditorialHomeScreen(
         }
 
         PaperSectionHeader(
-            if (state.reviewIsChallenge) "Mastery challenge" else "Review queue",
-            detail = if (state.due > 0) "${state.due} review items" else "clear",
+            "Gleanings",
+            detail = if (gleanings.isEmpty()) "empty" else "${gleanings.size} kept",
         )
         PaperSurface(Modifier.fillMaxWidth()) {
-            if (state.due > 0) {
+            if (gleanings.isEmpty()) {
+                Text("No gleanings yet.", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    if (state.reviewIsChallenge) "Nothing due. Keep the material honest." else "${state.due} review items",
-                    style = MaterialTheme.typography.headlineMedium,
-                )
-                Text(
-                    if (state.reviewIsChallenge) {
-                        "Aging material is ready to surface before it disappears."
-                    } else {
-                        "A small return keeps the reading alive."
-                    },
+                    "Finish a reading session and keep one idea worth carrying.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                state.reviewItems.forEach { item ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        Text("•", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.tertiary)
-                        Column(Modifier.weight(1f)) {
-                            Text(vm.titleOfConcept(item.conceptId), style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                item.cue ?: "Return point",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                item.mastery.name.lowercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+            } else {
+                Text("${gleanings.size} ideas kept", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    "Your reading, in your own words.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                gleanings.take(2).forEach { gleaning ->
+                    Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                        Text(vm.titleOf(gleaning.textId), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            gleaning.takeaway,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
-                if (state.due > state.reviewItems.size) {
-                    Text(
-                        "${state.due - state.reviewItems.size} more review items",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
                 Spacer(Modifier.height(12.dp))
-                Button(onClick = onReview, modifier = Modifier.fillMaxWidth()) { Text("Begin review →") }
-            } else {
-                Text("Nothing due today.", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Read a segment and new review items will appear tomorrow.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Button(onClick = onOpenGleanings, modifier = Modifier.fillMaxWidth()) {
+                    Text("Browse gleanings →")
+                }
             }
         }
 
