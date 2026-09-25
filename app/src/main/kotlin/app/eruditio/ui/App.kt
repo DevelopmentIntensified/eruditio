@@ -35,6 +35,7 @@ fun App(vm: EruditioViewModel) {
     EruditioTheme(palette) {
         var tabIndex by rememberSaveable { mutableIntStateOf(AppTab.TODAY.ordinal) }
         val tab = AppTab.entries[tabIndex]
+        LaunchedEffect(Unit) { vm.refresh() }
         LifecycleResumeEffect(Unit) {
             vm.refresh()
             onPauseOrDispose { }
