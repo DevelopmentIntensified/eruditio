@@ -47,11 +47,11 @@ internal fun EditorialHomeScreen(
         val percent = progressById[it.id] ?: 0
         isStarted(percent) && !isReadThrough(percent)
     }
-    val resumeMeta = state.resumeTextId?.let { id -> vm.texts.firstOrNull { it.id == id } }
-    val resumeId = resumeMeta?.id?.takeIf { !isReadThrough(progressById[it] ?: 0) }
+    val storedResume = state.resumeTextId?.let { id -> vm.texts.firstOrNull { it.id == id } }
+    val resumeId = storedResume?.id?.takeIf { !isReadThrough(progressById[it] ?: 0) }
         ?: inProgress.firstOrNull()?.id
         ?: unstarted.firstOrNull()?.id
-        ?: vm.texts.firstOrNull()?.id
+    val resumeMeta = vm.texts.firstOrNull { it.id == resumeId }
     val resumePercent = progressById[resumeId] ?: 0
     val shelf = (unstarted + inProgress)
         .distinctBy { it.id }
@@ -84,7 +84,10 @@ internal fun EditorialHomeScreen(
         }
 
         if (resumeMeta != null) {
-            PaperSectionHeader("Resume session", detail = if (resumePercent > 0) "$resumePercent% read" else "new session")
+            PaperSectionHeader(
+                if (resumePercent > 0) "Resume session" else "Start session",
+                detail = if (resumePercent > 0) "$resumePercent% read" else "new session",
+            )
             PaperSurface(Modifier.fillMaxWidth()) {
                 Text(
                     if (resumePercent > 0) "RESUME / READING ANCHOR" else "BEGIN / NEW SESSION",
