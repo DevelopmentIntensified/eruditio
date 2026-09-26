@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- The watcher must come back on its own after a reboot; the boot
+         receiver is a documented exemption from background FGS starts. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Special grant via Settings; UsageStatsManager-based detection per spec. -->
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
@@ -62,5 +65,16 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Watches app openings so the chosen friction pause can appear; runs while other apps are foreground." />
         </service>
+
+        <!-- Always-on arming: reboot or update re-arms the watcher and its watchdog. -->
+        <receiver
+            android:name=".intercept.WatcherBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

@@ -89,6 +89,7 @@ internal fun SettingsScreen(vm: EruditioViewModel, modifier: Modifier) {
                 }
             }
         }
+        WatcherCard()
         PaperSectionHeader("Reading")
         PaperSurface(Modifier.fillMaxWidth()) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

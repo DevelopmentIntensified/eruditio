@@ -14,6 +14,10 @@ _Avoid_: Block (hard-blocking is prohibited by design)
 A user-chosen scroll app that gets intercepted; sensible defaults are present on first run.
 _Avoid_: Blocked app, banned app
 
+**Watcher**:
+The always-on background observer that notices a target app reaching the foreground and summons the pause screen. Eruditio re-arms it on its own, and its state is stated plainly in Settings rather than assumed.
+_Avoid_: Daemon, background service, poller
+
 **Pause screen**:
 The friction surface shown over a target app: a short delay, a breathing mark, then an explicit choice. It never hard-blocks.
 _Avoid_: Friction screen, block screen, overlay

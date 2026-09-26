@@ -78,6 +78,9 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
+    // Watcher watchdog: the 15-minute self-heal that restarts a dead watcher (ticket 24).
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
+
     // One-time billing; no subscriptions, no ads, no third-party SDKs (spec).
     implementation("com.android.billingclient:billing-ktx:8.3.0")
 

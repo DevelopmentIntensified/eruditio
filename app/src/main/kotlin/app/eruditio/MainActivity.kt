@@ -1,15 +1,14 @@
 package app.eruditio
 
 import android.app.Activity
-import android.app.AppOpsManager
 import android.content.Context
 import android.os.Bundle
-import android.os.Process
 import android.provider.Settings
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.eruditio.intercept.UsageStatsWatcherService
+import app.eruditio.intercept.WatcherRuntime
 import app.eruditio.ui.App
 import app.eruditio.ui.EruditioViewModel
 
@@ -32,16 +31,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     companion object {
-        fun hasUsageAccess(context: Context): Boolean = try {
-            val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-            ops.checkOpNoThrow(
-                AppOpsManager.OPSTR_GET_USAGE_STATS,
-                Process.myUid(),
-                context.packageName,
-            ) == AppOpsManager.MODE_ALLOWED
-        } catch (e: Exception) {
-            false
-        }
+        fun hasUsageAccess(context: Context): Boolean = WatcherRuntime.hasUsageAccess(context)
 
         fun canDrawOverlays(context: Context): Boolean = Settings.canDrawOverlays(context)
     }
