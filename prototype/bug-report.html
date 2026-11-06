@@ -1,0 +1,304 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Not production code. Eruditio in-app bug report (ticket 22).
+
+  Q (page=report): What does the "Report a bug" composer look like when opened from Settings?
+     A sheet        · bottom sheet slides up over Settings (Material feel, dismissible by tap-outside)
+     B quiet page   · full-screen quiet page in the reader's paper style, ← back
+     C inline card  · expands in place inside the Settings list; no new surface
+
+  All variants share the same contract: user's own words only, version lines pre-filled,
+  Send hands the report to the device mail client, nothing collected/sent until Send.
+
+  Switch variants with the floating bar (or ← → keys). "✓ pick" records a verdict;
+  variant + pick persist in the URL. State is printed under the phone after every interaction.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eruditio — bug report (prototype)</title>
+<style>
+  :root{ --frame-w:390px; --frame-h:700px; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    font-family:Georgia,'Times New Roman',serif; background:#2b2a27; color:#111;
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding:26px 12px 120px;
+  }
+  .proto-tag{ color:#b9b4aa; font-family:Verdana,sans-serif; font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:12px; }
+  .phone{ width:var(--frame-w); height:var(--frame-h); border-radius:38px; padding:14px 10px; background:#0d0d0c; box-shadow:0 22px 60px rgba(0,0,0,.5); }
+  .screen{ width:100%; height:100%; border-radius:30px; overflow:hidden; background:#faf7f0; display:flex; flex-direction:column; position:relative; }
+  .screen.dark{ background:#282c34; color:#abb2bf; }
+  .appbar{ padding:14px 18px 10px; font-size:12px; color:#8a8272; border-bottom:1px solid #e4dfd2; font-family:Verdana,sans-serif; }
+  .screen.dark .appbar{ border-bottom-color:#3e4451; color:#5c6370; }
+  .content{ flex:1; overflow-y:auto; overscroll-behavior:contain; padding:0 18px 24px; }
+  h1.title{ font-size:24px; margin:16px 0 4px; }
+  .byline{ font-size:12px; color:#8a8272; margin-bottom:14px; }
+  .screen.dark .byline{ color:#5c6370; }
+  /* settings cards */
+  .card{ border:1px solid #e4dfd2; border-radius:12px; padding:14px; margin:12px 0; background:transparent; transition:all .25s; }
+  .screen.dark .card{ border-color:#3e4451; }
+  .card .lab{ font-size:10px; font-family:Verdana,sans-serif; text-transform:uppercase; letter-spacing:.07em; color:#8a8272; margin-bottom:8px; }
+  .screen.dark .card .lab{ color:#5c6370; }
+  .setrow{ display:flex; align-items:center; justify-content:space-between; padding:9px 0; font-size:14px; cursor:pointer; border-bottom:1px solid #e4dfd2; }
+  .screen.dark .setrow{ border-bottom-color:#3e4451; }
+  .setrow:last-child{ border-bottom:none; }
+  .setrow .chev{ color:#8a8272; font-family:Verdana,sans-serif; font-size:12px; }
+  .screen.dark .setrow .chev{ color:#5c6370; }
+  .setrow.report{ color:#a5822f; }
+  .screen.dark .setrow.report{ color:#61afef; }
+  /* composer bits (shared) */
+  .composer{ display:flex; flex-direction:column; gap:10px; }
+  .compose{ width:100%; min-height:110px; resize:none; border:1px solid #e4dfd2; border-radius:10px;
+            background:transparent; color:inherit; font-family:Georgia,serif; font-size:14px; line-height:1.55; padding:10px 12px; outline:none; }
+  .screen.dark .compose{ border-color:#3e4451; color:#abb2bf; }
+  .compose:focus{ border-color:#c8a24a; }
+  .vers{ font-size:11px; font-family:Verdana,sans-serif; color:#8a8272; line-height:1.7; }
+  .screen.dark .vers{ color:#5c6370; }
+  .vers b{ color:#5b564d; font-weight:normal; }
+  .screen.dark .vers b{ color:#abb2bf; }
+  .sendrow{ display:flex; align-items:center; gap:10px; }
+  .send{ background:#221f1a; color:#faf7f0; border:none; font-family:Verdana,sans-serif; font-size:12px;
+         padding:9px 18px; border-radius:20px; cursor:pointer; }
+  .screen.dark .send{ background:#61afef; color:#21252b; }
+  .send:disabled{ opacity:.35; cursor:default; }
+  .cancel{ background:none; border:none; font-family:Verdana,sans-serif; font-size:12px; color:#8a8272; cursor:pointer; }
+  .screen.dark .cancel{ color:#5c6370; }
+  .privacy{ font-size:10px; font-family:Verdana,sans-serif; color:#8a8272; line-height:1.6; }
+  .screen.dark .privacy{ color:#5c6370; }
+  /* variant A: bottom sheet */
+  .scrim{ position:absolute; inset:0; background:rgba(20,18,15,.45); opacity:0; pointer-events:none; transition:opacity .25s; z-index:20; }
+  .scrim.on{ opacity:1; pointer-events:auto; }
+  .sheet{ position:absolute; left:0; right:0; bottom:0; background:#faf7f0; border-radius:18px 18px 0 0;
+          padding:16px 18px 22px; z-index:21; transform:translateY(105%); transition:transform .3s cubic-bezier(.2,.8,.2,1);
+          box-shadow:0 -12px 40px rgba(0,0,0,.25); }
+  .screen.dark .sheet{ background:#21252b; }
+  .sheet.on{ transform:translateY(0); }
+  .grab{ width:36px; height:4px; border-radius:2px; background:#e4dfd2; margin:0 auto 12px; }
+  .screen.dark .grab{ background:#3e4451; }
+  /* variant B: quiet page */
+  .page{ position:absolute; inset:0; background:#faf7f0; z-index:30; display:none; flex-direction:column; }
+  .screen.dark .page{ background:#282c34; }
+  .page.on{ display:flex; }
+  .page .pbar{ padding:12px 14px; border-bottom:1px solid #e4dfd2; display:flex; align-items:center; gap:12px; font-family:Verdana,sans-serif; font-size:12px; color:#8a8272; }
+  .screen.dark .page .pbar{ border-bottom-color:#3e4451; color:#5c6370; }
+  .page .pbar .back{ background:none; border:none; font-size:17px; cursor:pointer; color:inherit; }
+  .page .pbody{ flex:1; overflow-y:auto; padding:16px 18px; display:flex; flex-direction:column; gap:10px; }
+  /* variant C: inline expansion */
+  .card.open{ border-color:#c8a24a; }
+  /* mail toast */
+  .toast{ position:absolute; left:50%; bottom:18px; transform:translateX(-50%) translateY(8px);
+          background:#221f1a; color:#faf7f0; font-family:Verdana,sans-serif; font-size:11px;
+          padding:8px 14px; border-radius:18px; opacity:0; transition:all .3s; z-index:40; pointer-events:none; white-space:nowrap; }
+  .screen.dark .toast{ background:#61afef; color:#21252b; }
+  .toast.on{ opacity:.96; transform:translateX(-50%) translateY(0); }
+  /* shell */
+  .floatbar{
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:8px; background:#111; color:#faf7f0;
+    padding:9px 12px; border-radius:26px; box-shadow:0 10px 30px rgba(0,0,0,.55);
+    font-family:Verdana,sans-serif; font-size:12px; z-index:50;
+  }
+  .floatbar button{ background:none; border:none; color:#faf7f0; font-size:16px; cursor:pointer; padding:2px 8px; }
+  .floatbar .vlabel{ min-width:230px; text-align:center; }
+  .state{ margin-top:14px; color:#b9b4aa; font-family:Verdana,sans-serif; font-size:11px; max-width:640px; text-align:center; line-height:1.6; }
+  .state .picks{ color:#c8a24a; }
+  .pickchip{ position:absolute; top:10px; right:12px; font-size:10px; font-family:Verdana,sans-serif;
+             border:1px solid #c8a24a; color:#a5822f; background:rgba(255,255,255,.5);
+             border-radius:12px; padding:4px 10px; cursor:pointer; z-index:10; }
+  .screen.dark .pickchip{ color:#61afef; border-color:#61afef; background:rgba(0,0,0,.3); }
+  .pickchip.picked{ background:#c8a24a; color:#fff; border-color:#c8a24a; }
+  .toggletheme{ position:fixed; top:14px; right:16px; background:#111; color:#faf7f0; border:none;
+                 font-family:Verdana,sans-serif; font-size:11px; padding:7px 12px; border-radius:16px; cursor:pointer; z-index:60; }
+</style>
+</head>
+<body>
+<div class="proto-tag">Eruditio · in-app bug report — PROTOTYPE (throwaway) · ticket 22</div>
+<div class="phone">
+  <div class="screen" id="screen">
+    <div class="appbar" id="appbar">…</div>
+    <div class="content" id="content"></div>
+    <div class="scrim" id="scrim"></div>
+    <div class="sheet" id="sheet"></div>
+    <div class="page" id="page"></div>
+    <div class="toast" id="toast"></div>
+    <button class="pickchip" id="pickchip">✓ pick this</button>
+  </div>
+</div>
+<button class="toggletheme" id="toggletheme">◐ dark</button>
+<div class="floatbar">
+  <button id="prev">←</button>
+  <span id="vlabel">…</span>
+  <button id="next">→</button>
+</div>
+<div class="state" id="state">…</div>
+
+<script>
+/* ---------- shell state ---------- */
+const el=id=>document.getElementById(id);
+const screenEl=el("screen"), content=el("content");
+const params=new URLSearchParams(location.search);
+const PICK_KEY="report";
+let variant=params.get("variant")||"A";
+let dark=false;
+let picked=params.get("picks")||"";
+function param(k,v){ params.set(k,v); history.replaceState(null,"",`?${params}`); }
+
+/* sample values the real app would read from the device */
+const APP="Eruditio 1.0 (1)";
+const ANDROID="Android 16 (API 36)";
+const MAIL="bugs@eruditio.app";
+const DRAFT="Swiping up from a checkpoint sometimes drops me at the start of the next chapter instead of where I paused.";
+const WHAT='What went wrong? Your own words — no logs or screenshots are attached.';
+const PRIVACY='Nothing is collected, logged, or sent until you tap Send. Send hands this text to your mail app — your words plus the version lines, nothing else.';
+
+/* ---------- shared composer ---------- */
+function composer(onSend){
+  const wrap=document.createElement("div");
+  wrap.className="composer";
+  wrap.innerHTML=`
+    <textarea class="compose" placeholder="${WHAT}"></textarea>
+    <div class="vers">report <b>to</b> ${MAIL}<br>${APP} · ${ANDROID}</div>
+    <div class="sendrow">
+      <button class="send">Send</button>
+      <button class="cancel">Discard</button>
+    </div>
+    <div class="privacy">${PRIVACY}</div>`;
+  wrap.querySelector(".send").onclick=onSend;
+  wrap.querySelector(".cancel").onclick=closeComposer;
+  const ta=wrap.querySelector(".compose"), send=wrap.querySelector(".send");
+  const sync=()=>{ send.disabled=!ta.value.trim(); };
+  ta.addEventListener("input",sync); sync();
+  return wrap;
+}
+
+/* ---------- variant A: bottom sheet ---------- */
+function renderA(){
+  content.innerHTML=`<h1 class="title">Settings</h1>
+    <div class="card"><div class="lab">Theme</div><div style="font-size:14px">Paper</div></div>
+    <div class="card"><div class="lab">Interception</div>
+      <div class="setrow"><span>Target apps</span><span class="chev">4 selected ›</span></div>
+      <div class="setrow"><span>Usage access</span><span class="chev">granted ›</span></div>
+    </div>
+    <div class="card"><div class="lab">Reading</div>
+      <div class="setrow"><span>Reading rail</span><span class="chev">on</span></div>
+    </div>
+    <div class="card"><div class="lab">About</div>
+      <div class="setrow report" id="reportrow"><span>Report a bug</span><span class="chev">›</span></div>
+      <div class="setrow"><span>Version</span><span class="chev">${APP}</span></div>
+    </div>`;
+  el("reportrow").onclick=openSheet;
+  sheet().innerHTML=`<div class="grab"></div><div style="font-size:17px;margin-bottom:12px">Report a bug</div>`;
+  sheet().appendChild(composer(()=>send("sheet · SEND → mail client opens")));
+}
+function sheet(){ return el("sheet"); }
+function openSheet(){
+  el("scrim").classList.add("on");
+  sheet().classList.add("on");
+  setStatus(`A · sheet opened over Settings — tap outside or Discard to dismiss`);
+}
+function closeComposer(){
+  sheet().classList.remove("on"); el("scrim").classList.remove("on");
+  el("page").classList.remove("on");
+  const card=content.querySelector(".card.open"); if(card)card.classList.remove("open");
+  const inline=el("inline"); if(inline)inline.innerHTML="";
+}
+el("scrim").onclick=closeComposer;
+
+/* ---------- variant B: quiet page ---------- */
+function renderB(){
+  content.innerHTML=`<h1 class="title">Settings</h1>
+    <div class="card"><div class="lab">Theme</div><div style="font-size:14px">Paper</div></div>
+    <div class="card"><div class="lab">Interception</div>
+      <div class="setrow"><span>Target apps</span><span class="chev">4 selected ›</span></div>
+      <div class="setrow"><span>Usage access</span><span class="chev">granted ›</span></div>
+    </div>
+    <div class="card"><div class="lab">Reading</div>
+      <div class="setrow"><span>Reading rail</span><span class="chev">on</span></div>
+    </div>
+    <div class="card"><div class="lab">About</div>
+      <div class="setrow report" id="reportrow"><span>Report a bug</span><span class="chev">›</span></div>
+      <div class="setrow"><span>Version</span><span class="chev">${APP}</span></div>
+    </div>`;
+  el("reportrow").onclick=()=>{ el("page").classList.add("on"); setStatus(`B · quiet page pushed — full-screen, reader-styled, ← back returns`); };
+  const page=el("page");
+  page.innerHTML=`<div class="pbar"><button class="back" id="back">←</button><span>Report a bug</span></div><div class="pbody" id="pbody"></div>`;
+  el("back").onclick=closeComposer;
+  el("pbody").appendChild(composer(()=>send("page · SEND → mail client opens")));
+}
+
+/* ---------- variant C: inline card ---------- */
+function renderC(){
+  content.innerHTML=`<h1 class="title">Settings</h1>
+    <div class="card"><div class="lab">Theme</div><div style="font-size:14px">Paper</div></div>
+    <div class="card"><div class="lab">Interception</div>
+      <div class="setrow"><span>Target apps</span><span class="chev">4 selected ›</span></div>
+      <div class="setrow"><span>Usage access</span><span class="chev">granted ›</span></div>
+    </div>
+    <div class="card"><div class="lab">Reading</div>
+      <div class="setrow"><span>Reading rail</span><span class="chev">on</span></div>
+    </div>
+    <div class="card" id="aboutcard"><div class="lab">About</div>
+      <div class="setrow report" id="reportrow"><span>Report a bug</span><span class="chev">▾</span></div>
+      <div id="inline"></div>
+      <div class="setrow"><span>Version</span><span class="chev">${APP}</span></div>
+    </div>`;
+  el("reportrow").onclick=()=>{
+    const inline=el("inline");
+    if(inline.childElementCount){ closeComposer(); return; }
+    el("aboutcard").classList.add("open");
+    inline.appendChild(composer(()=>send("inline · SEND → mail client opens")));
+    inline.scrollIntoView({behavior:"smooth",block:"center"});
+    setStatus(`C · composer expanded in place inside Settings — no new surface, page stays`);
+  };
+}
+
+/* ---------- send / toast / status ---------- */
+function toast(s){
+  const t=el("toast"); t.textContent=s; t.classList.add("on");
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("on"),2600);
+}
+function send(where){
+  closeComposer();
+  toast(`→ mail client: ${MAIL}`);
+  setStatus(`${where} — user's words + "${APP} · ${ANDROID}" handed to the mail client; nothing auto-captured`);
+}
+function setStatus(s){
+  el("state").innerHTML=`${s}<br><span class="picks">PICK — report=${picked||"∅"}</span>`;
+}
+
+/* ---------- shell render ---------- */
+const VARIANTS={
+  A:"bottom sheet over Settings",
+  B:"full-screen quiet page",
+  C:"inline card expansion",
+};
+const QB="What does the bug-report composer look like when opened from Settings?";
+function render(){
+  closeComposer();
+  el("appbar").innerHTML=`Eruditio · <b>report</b> — ${QB}`;
+  el("vlabel").textContent=`${variant} (${VARIANTS[variant]})`;
+  el("pickchip").classList.toggle("picked",picked===variant);
+  ({A:renderA,B:renderB,C:renderC})[variant]();
+  param("variant",variant); param("picks",picked);
+}
+function cycle(dir){
+  const keys=Object.keys(VARIANTS);
+  variant=keys[(keys.indexOf(variant)+dir+keys.length)%keys.length];
+  render();
+  setStatus(`variant ${variant} (${VARIANTS[variant]}) — open "Report a bug" from Settings to try it`);
+}
+el("prev").onclick=()=>cycle(-1);
+el("next").onclick=()=>cycle(1);
+el("pickchip").onclick=()=>{picked=variant;render();setStatus(`PICKED report=${variant} — recorded in the state line and URL`);};
+el("toggletheme").onclick=()=>{dark=!dark;screenEl.classList.toggle("dark",dark);el("toggletheme").textContent=dark?"◐ light":"◐ dark";};
+document.addEventListener("keydown",e=>{
+  if(/input|textarea/i.test(document.activeElement.tagName))return;
+  if(e.key==="ArrowRight")cycle(1); if(e.key==="ArrowLeft")cycle(-1);
+});
+render();
+setStatus(`Settings → "Report a bug" opens the composer — try Send with empty text, too`);
+</script>
+</body>
+</html>

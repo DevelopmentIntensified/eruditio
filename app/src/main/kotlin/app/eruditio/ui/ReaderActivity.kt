@@ -31,6 +31,21 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextField
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -65,9 +80,14 @@ import app.eruditio.AppContainer
 import app.eruditio.EruditioApp
 import app.eruditio.R
 import app.eruditio.core.CompletedSession
+import app.eruditio.core.Annotation
+import app.eruditio.core.AnnotationDraft
+import app.eruditio.core.AnnotationKind
 import app.eruditio.core.Groups
 import app.eruditio.core.GleaningHandoff
+import app.eruditio.core.ReaderItem
 import app.eruditio.core.ReaderText
+import app.eruditio.core.wordRangeAt
 import app.eruditio.ui.theme.EruditioTheme
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
@@ -321,14 +341,105 @@ private fun ReadingBody(
         items.indices.filter { readerText.isCheckpoint(it) }.toIntArray()
     }
 
+    // Reader marks (tickets 26→27, variant A): bookmarks hang off each
+    // paragraph's right edge, long-press opens the inline mark menu. All on
+    // device, per text, anchored in the same char space as positions.
+    var marks by remember(loaded.textId) { mutableStateOf(emptyList<Annotation>()) }
+    LaunchedEffect(loaded.textId) {
+        marks = container.annotations.forText(loaded.textId)
+    }
+    var markMenu by remember { mutableStateOf<MarkMenuContext?>(null) }
+    var marksOpen by remember { mutableStateOf(false) }
+    var noteSheet by remember { mutableStateOf<NoteTarget?>(null) }
+
+    fun refreshMarks() {
+        scope.launch { marks = container.annotations.forText(loaded.textId) }
+    }
+
+    fun toggleBookmark(textIndex: Int) {
+        scope.launch {
+            val anchor = readerText.startCharAt(textIndex) ?: return@launch
+            val existing = marks.firstOrNull {
+                it.kind == AnnotationKind.BOOKMARK && it.startChar == anchor
+            }
+            if (existing != null) container.annotations.drop(existing.id)
+            else container.annotations.keep(
+                AnnotationDraft(loaded.textId, AnnotationKind.BOOKMARK, anchor, anchor),
+            )
+            refreshMarks()
+        }
+    }
+
+    fun addHighlight(context: MarkMenuContext) {
+        val item = items[context.textIndex]
+        val start = item.startChar + context.word.first
+        val end = item.startChar + context.word.last + 1
+        scope.launch {
+            if (marks.none {
+                    it.kind == AnnotationKind.HIGHLIGHT && it.startChar == start && it.endChar == end
+                }
+            ) {
+                container.annotations.keep(
+                    AnnotationDraft(loaded.textId, AnnotationKind.HIGHLIGHT, start, end),
+                )
+                refreshMarks()
+            }
+            markMenu = null
+        }
+    }
+
+    /** The note editor opens with the pressed word as its anchor; an existing
+     *  note at the same range edits in place instead of stacking a second. */
+    fun openNoteSheet(context: MarkMenuContext) {
+        val item = items[context.textIndex]
+        val start = item.startChar + context.word.first
+        val end = item.startChar + context.word.last + 1
+        noteSheet = NoteTarget(
+            startChar = start,
+            endChar = end,
+            existing = marks.firstOrNull {
+                it.kind == AnnotationKind.NOTE && it.startChar == start && it.endChar == end
+            },
+        )
+        markMenu = null
+    }
+
+    fun jumpTo(mark: Annotation) {
+        marksOpen = false
+        markMenu = null
+        scope.launch {
+            listState.scrollToItem(readerText.listIndexOf(readerText.itemIndexAt(mark.startChar)))
+        }
+    }
+
+    fun saveNote(text: String) {
+        val target = noteSheet ?: return
+        scope.launch {
+            if (target.existing != null) {
+                container.annotations.rewrite(target.existing.id, text)
+            } else {
+                container.annotations.keep(
+                    AnnotationDraft(loaded.textId, AnnotationKind.NOTE, target.startChar, target.endChar, text),
+                )
+            }
+            refreshMarks()
+            noteSheet = null
+        }
+    }
+
     // Full-screen plate viewer (map + timeline) over the ancient track.
     var plateViewer by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.padding(horizontal = 24.dp)) {
-            Text(loaded.title, style = MaterialTheme.typography.titleLarge)
-            if (loaded.author.isNotEmpty()) {
-                Text(loaded.author, style = MaterialTheme.typography.labelMedium)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(start = 24.dp)) {
+                Text(loaded.title, style = MaterialTheme.typography.titleLarge)
+                if (loaded.author.isNotEmpty()) {
+                    Text(loaded.author, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+            TextButton(onClick = { marksOpen = true }) {
+                Text("✍ marks · ${marks.size}", style = MaterialTheme.typography.labelMedium)
             }
         }
         Row(Modifier.weight(1f).fillMaxWidth()) {
@@ -398,10 +509,15 @@ private fun ReadingBody(
                             }
                         }
                     }
-                    Text(
-                        item.text,
-                        Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 30.sp),
+                    MarkLine(
+                        item = item,
+                        textIndex = textIndex,
+                        marks = marks,
+                        markMenu = markMenu,
+                        onMenu = { markMenu = it },
+                        onToggleBookmark = { toggleBookmark(it) },
+                        onAddHighlight = { addHighlight(it) },
+                        onOpenNote = { openNoteSheet(it) },
                     )
                 }
                 }
@@ -474,6 +590,35 @@ private fun ReadingBody(
 
     if (plateViewer) {
         PlateViewer(onDismiss = { plateViewer = false })
+    }
+
+    if (marksOpen) {
+        MarksSheet(
+            marks = marks.sortedBy { it.startChar },
+            items = items,
+            readerText = readerText,
+            onJump = { jumpTo(it) },
+            onEditNote = { mark ->
+                marksOpen = false
+                noteSheet = NoteTarget(mark.startChar, mark.endChar, existing = mark)
+            },
+            onDrop = {
+                scope.launch {
+                    container.annotations.drop(it.id)
+                    refreshMarks()
+                }
+            },
+            onDismiss = { marksOpen = false },
+        )
+    }
+
+    noteSheet?.let { target ->
+        NoteSheet(
+            target = target,
+            items = items,
+            onDismiss = { noteSheet = null },
+            onSave = { text -> saveNote(text) },
+        )
     }
 }
 
@@ -741,3 +886,271 @@ private fun Rail(
     }
 }
 
+
+/* ---------------- reader marks (variant A, tickets 26→27) ---------------- */
+
+/** The long-press menu's context: the item it belongs to and the word range in it. */
+private data class MarkMenuContext(val textIndex: Int, val word: IntRange)
+
+/** The note editor's anchor: the character range and an existing note, if editing. */
+private data class NoteTarget(
+    val startChar: Long,
+    val endChar: Long,
+    val existing: Annotation? = null,
+)
+
+/** Style pass: the accent behind every highlight range overlapping this item. */
+private fun markedText(item: ReaderItem, marks: List<Annotation>, tint: Color): AnnotatedString =
+    buildAnnotatedString {
+        append(item.text)
+        val itemEnd = item.startChar + item.text.length
+        marks.filter {
+            it.kind == AnnotationKind.HIGHLIGHT && it.endChar > item.startChar && it.startChar < itemEnd
+        }.forEach { mark ->
+            val from = (mark.startChar - item.startChar).toInt().coerceAtLeast(0)
+            val to = (mark.endChar - item.startChar).toInt().coerceAtMost(item.text.length)
+            if (to > from) addStyle(SpanStyle(background = tint.copy(alpha = 0.25f)), from, to)
+        }
+    }
+
+/** Drawer excerpt: the reader's own words for a note, the source words otherwise. */
+private fun markExcerpt(mark: Annotation, items: List<ReaderItem>, readerText: ReaderText): String =
+    when (mark.kind) {
+        AnnotationKind.NOTE -> mark.noteText.orEmpty()
+        else -> {
+            val item = items.getOrNull(readerText.itemIndexAt(mark.startChar)) ?: return ""
+            val from = (mark.startChar - item.startChar).toInt().coerceIn(0, item.text.length)
+            val to = (mark.endChar - item.startChar).toInt().coerceIn(from, item.text.length)
+            item.text.substring(from, to)
+        }
+    }.trim().take(72)
+
+/**
+ * One text row with variant A's affordances: the hanging bookmark caret at the
+ * right edge, a note marker when a note is anchored here, and the long-press
+ * inline mark menu. The mark column lives outside the text metrics so the
+ * reading line stays unchanged.
+ */
+@Composable
+private fun MarkLine(
+    item: ReaderItem,
+    textIndex: Int,
+    marks: List<Annotation>,
+    markMenu: MarkMenuContext?,
+    onMenu: (MarkMenuContext?) -> Unit,
+    onToggleBookmark: (Int) -> Unit,
+    onAddHighlight: (MarkMenuContext) -> Unit,
+    onOpenNote: (MarkMenuContext) -> Unit,
+) {
+    val bookmarked = marks.any {
+        it.kind == AnnotationKind.BOOKMARK && it.startChar == item.startChar
+    }
+    val hasNote = marks.any {
+        it.kind == AnnotationKind.NOTE &&
+            it.endChar > item.startChar && it.startChar < item.startChar + item.text.length
+    }
+    val tint = MaterialTheme.colorScheme.tertiary
+    val quiet = MaterialTheme.colorScheme.outlineVariant
+    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+
+    Row(Modifier.fillMaxWidth()) {
+        Box(Modifier.weight(1f)) {
+            Text(
+                markedText(item, marks, tint),
+                Modifier
+                    .fillMaxWidth()
+                    .pointerInput(textIndex) {
+                        detectTapGestures(onLongPress = { position ->
+                            val layout = layoutResult ?: return@detectTapGestures
+                            val word = wordRangeAt(item.text, layout.getOffsetForPosition(position))
+                                ?: return@detectTapGestures
+                            onMenu(MarkMenuContext(textIndex, word))
+                        })
+                    },
+                onTextLayout = { layoutResult = it },
+                style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 30.sp),
+            )
+            markMenu?.takeIf { it.textIndex == textIndex }?.let { menu ->
+                val layout = layoutResult ?: return@let
+                val hotBox = layout.getBoundingBox(menu.word.first)
+                val offset = with(LocalDensity.current) {
+                    IntOffset(hotBox.left.toInt(), (hotBox.top - 50.dp.toPx()).toInt().coerceAtLeast(0))
+                }
+                Popup(
+                    alignment = Alignment.TopStart,
+                    offset = offset,
+                    onDismissRequest = { onMenu(null) },
+                    properties = PopupProperties(focusable = true),
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.inverseSurface,
+                        shadowElevation = 4.dp,
+                    ) {
+                        Row(Modifier.padding(horizontal = 8.dp, vertical = 2.dp)) {
+                            TextButton(onClick = { onAddHighlight(menu) }) {
+                                Text("Highlight", color = MaterialTheme.colorScheme.inverseOnSurface)
+                            }
+                            TextButton(onClick = { onOpenNote(menu) }) {
+                                Text("Note", color = MaterialTheme.colorScheme.inverseOnSurface)
+                            }
+                            TextButton(onClick = { onMenu(null) }) {
+                                Text("✕", color = MaterialTheme.colorScheme.inverseOnSurface)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Column(
+            Modifier.width(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                "◇",
+                Modifier
+                    .clickable { onToggleBookmark(textIndex) }
+                    .padding(top = 2.dp),
+                color = if (bookmarked) tint else quiet,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (hasNote) {
+                Text(
+                    "¶",
+                    Modifier.padding(top = 2.dp),
+                    color = tint,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+    }
+}
+
+/** The note composer: target range previewed in the surface's words. */
+@Composable
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+private fun NoteSheet(
+    target: NoteTarget,
+    items: List<ReaderItem>,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var draft by remember(target.existing?.id, target.startChar, target.endChar) {
+        mutableStateOf(target.existing?.noteText.orEmpty())
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+            Text("Note", style = MaterialTheme.typography.titleMedium)
+            Text(
+                noteAnchorPreview(target, items),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            TextField(
+                value = draft,
+                onValueChange = { draft = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+                    .height(120.dp),
+                placeholder = { Text("An idea, in your own words") },
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(top = 12.dp),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onDismiss) { Text("Discard") }
+                TextButton(
+                    enabled = draft.isNotBlank(),
+                    onClick = { onSave(draft) },
+                ) { Text(if (target.existing != null) "Update" else "Save") }
+            }
+        }
+    }
+}
+
+/** The note's source words, trimmed to the anchor, for the composer preview. */
+private fun noteAnchorPreview(target: NoteTarget, items: List<ReaderItem>): String {
+    val item = items.lastOrNull { it.startChar <= target.startChar } ?: return ""
+    val from = (target.startChar - item.startChar).toInt().coerceIn(0, item.text.length)
+    val to = (target.endChar - item.startChar).toInt().coerceIn(from, item.text.length)
+    return if (to > from) {
+        "“" + item.text.substring(from, to).trim() + "”"
+    } else {
+        ""
+    }
+}
+
+/** The marks drawer: every kept mark for this text, jump to the anchor. */
+@Composable
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+private fun MarksSheet(
+    marks: List<Annotation>,
+    items: List<ReaderItem>,
+    readerText: ReaderText,
+    onJump: (Annotation) -> Unit,
+    onEditNote: (Annotation) -> Unit,
+    onDrop: (Annotation) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(bottom = 24.dp)) {
+            Text(
+                "Marks in this text",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
+            if (marks.isEmpty()) {
+                Text(
+                    "Nothing marked yet. Long-press a word to highlight or note it; the hanging caret bookmarks the line.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                )
+            }
+            marks.forEach { mark ->
+                val glyph = when (mark.kind) {
+                    AnnotationKind.BOOKMARK -> "◇"
+                    AnnotationKind.HIGHLIGHT -> "▬"
+                    AnnotationKind.NOTE -> "¶"
+                }
+                val label = "line ${readerText.itemIndexAt(mark.startChar) + 1} · ${mark.kind.name.lowercase()}"
+                val tint = MaterialTheme.colorScheme.tertiary
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (mark.kind == AnnotationKind.NOTE) onEditNote(mark) else onJump(mark)
+                        }
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(glyph, color = tint, style = MaterialTheme.typography.titleSmall)
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (markExcerpt(mark, items, readerText).isNotBlank()) {
+                            Text(
+                                markExcerpt(mark, items, readerText),
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
+                    }
+                    Text(
+                        "✕",
+                        Modifier
+                            .clickable { onDrop(mark) }
+                            .padding(8.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+        }
+    }
+}

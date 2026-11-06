@@ -1,0 +1,52 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Three structural variants for the post-reading
+  Gleaning flow: reader takeaway + curated context + source. Not production.
+  Switch with ?variant=A|B|C, the floating bar, or left/right arrow keys.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eruditio — Gleaning prototype</title>
+<style>
+:root{--paper:#faf7f0;--ink:#24211c;--muted:#817967;--rule:#ded7c8;--gold:#b58a2d;--dark:#282c34}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#292824;color:#eee;font:14px/1.45 Georgia,serif;display:flex;justify-content:center;padding:22px 12px 120px}
+.tag{position:fixed;top:12px;left:16px;color:#aaa;font:10px Verdana,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+.phone{width:min(390px,100vw);height:min(790px,calc(100vh - 100px));min-height:620px;background:#111;border-radius:36px;padding:10px;box-shadow:0 25px 70px #0008}
+.screen{height:100%;overflow:auto;background:var(--paper);color:var(--ink);border-radius:28px;padding:20px 18px 28px}
+.eyebrow{font:10px Verdana,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}h1{font-size:27px;font-weight:normal;line-height:1.1;margin:8px 0 5px}h2{font-size:20px;font-weight:normal;margin:0 0 8px}h3{font-size:15px;font-weight:normal;margin:0 0 7px}.sub{color:var(--muted);font-size:14px;margin:0 0 18px}.rule{height:1px;background:var(--rule);margin:14px 0}
+.source{background:#f2eee4;border-left:3px solid var(--gold);padding:13px 14px;margin:12px 0;font-size:16px;line-height:1.55}.label{font:10px Verdana,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}.insight{background:#eee7d5;border:1px solid #d7c99e;padding:14px;margin:12px 0}.insight p{font-size:17px;line-height:1.5;margin:0}.sourcecite{font:11px Verdana,sans-serif;color:var(--muted);margin-top:10px}
+textarea{width:100%;min-height:108px;resize:vertical;border:1px solid var(--rule);background:#fffdf8;color:var(--ink);padding:12px;font:16px/1.45 Georgia,serif;outline:none}textarea:focus{border-color:var(--gold)}button{font:12px Verdana,sans-serif;cursor:pointer;border:1px solid var(--ink);background:var(--ink);color:var(--paper);padding:11px 14px}button.secondary{background:transparent;color:var(--ink)}button:disabled{opacity:.35;cursor:not-allowed}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.small{font:11px Verdana,sans-serif;color:var(--muted);margin-top:7px}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}.split>div{min-width:0}.margin-note{border-left:2px solid var(--gold);padding-left:10px;min-height:160px}.step{display:flex;gap:5px;margin:0 0 18px}.step span{height:3px;flex:1;background:var(--rule)}.step span.on{background:var(--gold)}.stepcopy{color:var(--muted);font-size:13px;margin:-10px 0 14px}.saved{border:1px solid var(--gold);padding:18px;background:#f5efdf}.saved strong{font-size:20px;font-weight:normal}.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.pair>div{padding:10px;background:#fffdf8;border:1px solid var(--rule);font-size:13px}.pair b{display:block;font:10px Verdana,sans-serif;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.switcher{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:#111;color:#faf7f0;padding:9px 12px;border-radius:28px;box-shadow:0 10px 30px #0008;z-index:4;font:12px Verdana,sans-serif}.switcher button{background:none;border:0;color:#faf7f0;padding:2px 8px;font-size:17px}.vlabel{min-width:220px;text-align:center}.state{position:fixed;bottom:68px;left:50%;transform:translateX(-50%);width:min(620px,94vw);color:#bdb6a9;text-align:center;font:11px/1.5 Verdana,sans-serif}.state b{color:#e3c778}
+@media(max-width:430px){.phone{height:calc(100vh - 82px);min-height:560px}.split{grid-template-columns:1fr}.margin-note{min-height:0}.pair{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="tag">Eruditio · Gleaning · PROTOTYPE</div>
+<main class="phone"><section class="screen" id="screen"></section></main>
+<div class="switcher"><button id="prev" aria-label="Previous variant">←</button><span class="vlabel" id="vlabel"></span><button id="next" aria-label="Next variant">→</button></div>
+<div class="state" id="state"></div>
+<script>
+const params=new URLSearchParams(location.search);let variant=(params.get('variant')||'A').toUpperCase();const names={A:'paired page',B:'margin conversation',C:'three movements'};
+const source='“Piety, then, is that which is dear to the gods, and impiety is that which is not dear to them.”';
+const curated='Euthyphro’s answer sounds exact, but it hides a circle: the action is called pious because the gods approve it, while the approval is inferred from the action’s piety.';
+const sample='A confident answer can still be circular.';
+let state={takeaway:sample,revealed:false,saved:false,step:1};
+function esc(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function setVariant(v){variant=v;params.set('variant',v);history.replaceState(null,'','?'+params);state={takeaway:sample,revealed:false,saved:false,step:1};render()}
+function sourceBlock(){return `<div class="source">${source}</div><div class="sourcecite">Plato · Euthyphro · source passage</div>`}
+function insightBlock(){return `<div class="insight"><div class="label">A curated reading</div><p>${curated}</p></div>`}
+function editor(){return `<div class="label">Your takeaway</div><textarea id="takeaway" placeholder="What is worth carrying forward?">${esc(state.takeaway)}</textarea><div class="small">Write in your own words. This is not graded.</div>`}
+function saveBlock(){return `<div class="actions"><button id="save" ${!state.revealed||!state.takeaway.trim()?'disabled':''}>Keep this gleaning</button><button class="secondary" id="reset">Start over</button></div>${state.saved?'<div class="saved"><strong>Saved to your Gleanings.</strong><p class="small">Your note stays yours. The source and curated reading stay attached.</p></div>':''}`}
+function paired(){return `<div class="eyebrow">Gleaning / Euthyphro</div><h1>Keep what the passage gives you.</h1><p class="sub">Read once. Name one idea. Then see the book beside it.</p><h2>1 · Notice</h2>${sourceBlock()}${editor()}<div class="actions"><button id="reveal" ${state.revealed?'disabled':''}>See the book's angle →</button></div>${state.revealed?`<h2>2 · Compare</h2>${insightBlock()}<div class="pair"><div><b>Your takeaway</b>${esc(state.takeaway)||'—'}</div><div><b>Curated lens</b>${curated}</div></div>${saveBlock()}`:''}`}
+function margin(){return `<div class="eyebrow">Gleaning / Euthyphro</div><h1>Read with a margin.</h1><p class="sub">Your response lives beside the passage; the second reading arrives after you commit.</p><div class="split"><div><div class="label">Passage</div>${sourceBlock()}</div><div class="margin-note"><div class="label">Your margin</div>${editor()}<div class="actions"><button id="reveal" ${state.revealed?'disabled':''}>Add a second reading →</button></div>${state.revealed?insightBlock():''}</div></div>${state.revealed?saveBlock():''}`}
+function movements(){const step=state.step;let body='';if(step===1)body=`<div class="step"><span class="on"></span><span></span><span></span></div><div class="stepcopy">1 of 3 · Notice</div><h2>What does this passage give you?</h2>${sourceBlock()}${editor()}<div class="actions"><button id="next" ${!state.takeaway.trim()?'disabled':''}>Seal my takeaway →</button></div>`;if(step===2)body=`<div class="step"><span class="on"></span><span class="on"></span><span></span></div><div class="stepcopy">2 of 3 · Compare</div><h2>Hold your reading beside another.</h2><div class="pair"><div><b>Your takeaway</b>${esc(state.takeaway)}</div><div><b>Source</b>${source}</div></div>${insightBlock()}<div class="actions"><button id="next">Keep this pair →</button></div>`;if(step===3)body=`<div class="step"><span class="on"></span><span class="on"></span><span class="on"></span></div><div class="stepcopy">3 of 3 · Keep</div><h2>A small thing worth carrying.</h2>${saveBlock()}`;return `<div class="eyebrow">Gleaning / Euthyphro</div><h1>Three movements.</h1><p class="sub">Notice. Compare. Keep.</p>${body}`}
+function render(){const screen=document.getElementById('screen');screen.innerHTML=variant==='A'?paired():variant==='B'?margin():movements();document.getElementById('vlabel').textContent=`${variant} · ${names[variant]}`;document.getElementById('state').innerHTML=`<b>${variant}</b> · takeaway ${state.takeaway.trim()?'present':'empty'} · curated ${state.revealed?'shown':'hidden'} · ${state.saved?'saved':'unsaved'}`;bind()}
+function bind(){const t=document.getElementById('takeaway');if(t)t.addEventListener('input',e=>{state.takeaway=e.target.value;updateState()});['reveal','save','reset','next'].forEach(id=>{const b=document.getElementById(id);if(b)b.onclick=()=>{if(id==='reveal')state.revealed=true;if(id==='save')state.saved=true;if(id==='reset')state={takeaway:'',revealed:false,saved:false,step:1};if(id==='next')state.step=Math.min(3,state.step+1);render()}})}
+function updateState(){const t=document.getElementById('takeaway');if(t)state.takeaway=t.value;const b=document.getElementById('next');if(b)b.disabled=!state.takeaway.trim();document.getElementById('state').innerHTML=`<b>${variant}</b> · takeaway ${state.takeaway.trim()?'present':'empty'} · curated ${state.revealed?'shown':'hidden'} · ${state.saved?'saved':'unsaved'}`}
+document.getElementById('prev').onclick=()=>setVariant(variant==='A'?'C':String.fromCharCode(variant.charCodeAt(0)-1));document.getElementById('next').onclick=()=>setVariant(variant==='C'?'A':String.fromCharCode(variant.charCodeAt(0)+1));document.addEventListener('keydown',e=>{if(['TEXTAREA','INPUT'].includes(document.activeElement.tagName))return;if(e.key==='ArrowLeft')document.getElementById('prev').click();if(e.key==='ArrowRight')document.getElementById('next').click()});render();
+</script>
+</body>
+</html>

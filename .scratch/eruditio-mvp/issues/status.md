@@ -4,7 +4,9 @@ Pull the next task from the queue below. Do **not** re-read all ticket files to 
 
 ## Queue (next up, in order)
 
-- (empty — 24 taken; next ticket is the owner's call)
+- **25 — only the bundled default text is readable** (bug, owner report): **needs-info** — row→text path verified clean at HEAD on debug + release builds (device-evidenced on the ticket); two identified "can't read" states awaiting owner's flow/surface answer: trial-exhausted silent dead end, pause screen single-book.
+- **26 — reader annotations (bookmark, highlight, note)**: prototype built + smoked (`prototype/annotations.html`); **owner picks A/B/C** before code (27).
+- **27 — annotation implementation**: waits on the 26 verdict.
 
 ## Recently completed
 
@@ -26,6 +28,11 @@ Pull the next task from the queue below. Do **not** re-read all ticket files to 
 ## Bookkeeping pending
 
 (none)
+
+## Device pushes (kept from now on — owner instruction 2026-10-31, "keep track")
+
+- 2026-10-31 — owner reports everything pushed to the device (emulator-5554 was up earlier that day). Format going forward: date · commit · build type · target.
+- 2026-10-31 — agent: rebuilt and installed fresh for repro — debug APK (`:app:assembleDebug`, tree = `9fa1d4b` + uncommitted watcher edits), then release APK (`:app:assembleRelease`, same tree; debug-key signed) — both on emulator-5554. Emulator data was wiped at the start of repro (`pm clear`/uninstall; the owner's previously pushed install/data is not recoverable from there).
 
 ## Agent work done, awaiting human device steps (do NOT re-implement)
 

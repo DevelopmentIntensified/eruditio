@@ -1,6 +1,10 @@
 package app.eruditio
 
 import app.eruditio.core.Clock
+import app.eruditio.core.Annotation
+import app.eruditio.core.AnnotationKind
+import app.eruditio.core.AnnotationStore
+import app.eruditio.core.AnnotationDraft
 import app.eruditio.core.Entitlement
 import app.eruditio.core.EntitlementStore
 import app.eruditio.core.InterceptionLog
@@ -132,6 +136,46 @@ class FakePositionStore(
 ) : PositionStore {
     override suspend fun restoreOffset(textId: String): Long? = offsets[textId]
     override suspend fun lastReadTextId(): String? = lastTextId
+}
+
+/**
+ * Mirrors the Room adapter's keep/rewrite/forText/drop contract for reader
+ * marks (variant A) so the store interface can be tested without Android.
+ */
+class FakeAnnotationStore : AnnotationStore {
+    private val rows = LinkedHashMap<Long, Annotation>()
+    private var nextId = 1L
+
+    override suspend fun keep(draft: AnnotationDraft): Annotation {
+        val stored = Annotation(
+            id = nextId++,
+            textId = draft.textId,
+            kind = draft.kind,
+            startChar = draft.startChar,
+            endChar = draft.endChar,
+            noteText = draft.noteText,
+        )
+        rows[stored.id] = stored
+        return stored
+    }
+
+    override suspend fun rewrite(id: Long, noteText: String): Annotation? {
+        if (noteText.isBlank()) {
+            throw IllegalArgumentException("A note needs the reader's own words")
+        }
+        val row = rows[id] ?: return null
+        if (row.kind != AnnotationKind.NOTE) return null
+        val updated = row.copy(noteText = noteText)
+        rows[id] = updated
+        return updated
+    }
+
+    override suspend fun forText(textId: String): List<Annotation> =
+        rows.values.filter { it.textId == textId }.sortedBy { it.startChar }
+
+    override suspend fun drop(id: Long) {
+        rows.remove(id)
+    }
 }
 
 /**

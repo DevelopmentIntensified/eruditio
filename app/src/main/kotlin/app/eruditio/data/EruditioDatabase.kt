@@ -18,6 +18,10 @@ import app.eruditio.core.InterceptionResult
 import app.eruditio.core.SessionRecord
 import kotlinx.coroutines.flow.Flow
 
+import app.eruditio.core.AnnotationDraft
+import app.eruditio.core.AnnotationKind
+import app.eruditio.core.Annotation
+
 @Entity(tableName = "reading_positions")
 data class ReadingPositionEntity(
     @PrimaryKey val textId: String,
@@ -126,6 +130,36 @@ fun PendingGleaningDraft.toEntity(createdAtMillis: Long) = GleaningEntity(
 )
 
 fun EntitlementEntity.toEntitlement() = Entitlement(owned, freeSessionsUsed)
+
+@Entity(tableName = "annotations")
+data class AnnotationEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val textId: String,
+    /** AnnotationKind name ("bookmark" | "highlight" | "note"). */
+    val kind: String,
+    val startChar: Long,
+    val endChar: Long,
+    val noteText: String? = null,
+    val createdAtMillis: Long,
+)
+
+fun AnnotationEntity.toAnnotation() = Annotation(
+    id = id,
+    textId = textId,
+    kind = AnnotationKind.valueOf(kind),
+    startChar = startChar,
+    endChar = endChar,
+    noteText = noteText,
+)
+
+fun AnnotationDraft.toEntity(createdAtMillis: Long) = AnnotationEntity(
+    textId = textId,
+    kind = kind.name,
+    startChar = startChar,
+    endChar = endChar,
+    noteText = noteText,
+    createdAtMillis = createdAtMillis,
+)
 
 @Dao
 interface ReadingPositionDao {
@@ -244,6 +278,24 @@ interface EntitlementDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entitlement: EntitlementEntity)
+}
+
+@Dao
+interface AnnotationDao {
+    @Insert
+    suspend fun keep(entity: AnnotationEntity): Long
+
+    @Query("SELECT * FROM annotations WHERE textId = :textId ORDER BY startChar, id")
+    suspend fun forText(textId: String): List<AnnotationEntity>
+
+    @Query("SELECT * FROM annotations WHERE id = :id")
+    suspend fun get(id: Long): AnnotationEntity?
+
+    @Query("UPDATE annotations SET noteText = :noteText WHERE id = :id AND kind = 'NOTE'")
+    suspend fun rewriteNote(id: Long, noteText: String): Int
+
+    @Query("DELETE FROM annotations WHERE id = :id")
+    suspend fun drop(id: Long)
 }
 
 fun InterceptionResult.toDbString() = name

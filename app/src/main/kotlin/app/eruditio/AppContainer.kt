@@ -3,6 +3,7 @@ package app.eruditio
 import android.app.Application
 import android.content.Context
 import app.eruditio.core.ConceptSource
+import app.eruditio.core.AnnotationStore
 import app.eruditio.core.GleaningContextSource
 import app.eruditio.core.GleaningStore
 import app.eruditio.core.LedgerStore
@@ -12,6 +13,7 @@ import app.eruditio.core.SessionController
 import app.eruditio.core.SessionLog
 import app.eruditio.core.TrialGate
 import app.eruditio.data.AssetGleaningContextSource
+import app.eruditio.data.RoomAnnotationStore
 import app.eruditio.data.DeviceClock
 import app.eruditio.data.EruditioDatabase
 import app.eruditio.data.PlayBillingGate
@@ -38,7 +40,8 @@ class AppContainer(private val app: Application) {
     private val db = EruditioDatabase.build(app)
     private val clock = DeviceClock()
     val entitlements = EntitlementRepository(db.entitlementDao())
-    val trial = TrialGate(entitlements, isDebug = BuildConfig.DEBUG)
+    // FOSS flavor unlocks the core loop like debug: no Play Billing on F-Droid.
+    val trial = TrialGate(entitlements, isDebug = BuildConfig.DEBUG || BuildConfig.FLAVOR == "foss")
 
     val appContext: Context get() = app
     val hasUsageAccess: Boolean get() = MainActivity.hasUsageAccess(app)
@@ -65,6 +68,7 @@ class AppContainer(private val app: Application) {
     val sessionLog: SessionLog = RoomSessionLog(db.sessionDao())
     val gleanings: GleaningStore = RoomGleaningStore(db.gleaningDao(), clock)
     val gleaningContexts: GleaningContextSource = AssetGleaningContextSource(app)
+    val annotations: AnnotationStore = RoomAnnotationStore(db.annotationDao(), clock)
 
     /** Seam adapter: offset primitive only — Room entities never cross into the core. */
     val positionStore: PositionStore = object : PositionStore {

@@ -41,6 +41,7 @@ class UsageStatsWatcherService : Service() {
         startForeground(NOTIF_ID, notification())
         seedForegroundState()
         WatcherRuntime.beat(this)
+        WatcherRuntime.log("service up, watching for targets (seed=$lastForegroundPackage)")
         // A service the OS killed mid-session comes back through the watchdog,
         // not through the user opening the app.
         WatcherWatchdog.schedule(this)

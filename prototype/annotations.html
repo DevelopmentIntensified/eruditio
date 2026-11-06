@@ -1,0 +1,419 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Not production code. Eruditio reader annotations (ticket 26).
+
+  Q (page=marks): How do bookmark / highlight / note live on the reading surface?
+     A selection   · select text → inline mark menu right above it; a hanging caret at the
+                     right edge bookmarks the current line (tap on/off)
+     B band        · quiet pill band at the reader bottom: Bookmark / Highlight / Note / Marks;
+                     Highlight applies to the current selection, otherwise to the top visible line
+     C rail        · existing marks live on a right margin rail (bookmark diamond, highlight
+                     tick, note drop); "+" on a rail line opens the composer anchored there;
+                     the rail doubles as the list — nothing ever covers the text
+
+  All variants share the same contract: marks stay on-device per text, anchored in the same
+  character-offset space as sessions/positions, and a marks list lets you jump back exactly.
+  No analytics, no export (the ticket-22 privacy posture).
+
+  Switch variants with the floating bar (or ← → keys). Select text with the mouse to see
+  mark placement. "✓ pick" records a verdict; variant + pick persist in the URL.
+  State is printed under the phone after every interaction.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eruditio — reader annotations (prototype)</title>
+<style>
+  :root{ --frame-w:390px; --frame-h:760px; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    font-family:Georgia,'Times New Roman',serif; background:#2b2a27; color:#111;
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding:26px 12px 120px;
+  }
+  .proto-tag{ color:#b9b4aa; font-family:Verdana,sans-serif; font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:12px; }
+  .phone{ width:var(--frame-w); height:var(--frame-h); border-radius:38px; padding:14px 10px; background:#0d0d0c; box-shadow:0 22px 60px rgba(0,0,0,.5); }
+  .screen{ width:100%; height:100%; border-radius:30px; overflow:hidden; background:#faf7f0; display:flex; flex-direction:column; position:relative; }
+  .screen.dark{ background:#282c34; color:#abb2bf; }
+  .appbar{ padding:14px 18px 8px; font-size:12px; color:#8a8272; border-bottom:1px solid #e4dfd2; font-family:Verdana,sans-serif; display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .screen.dark .appbar{ border-bottom-color:#3e4451; color:#5c6370; }
+  .appbar .bk{ color:#a5822f; }
+  .screen.dark .appbar .bk{ color:#61afef; }
+  .appbar .chip{ font-size:11px; color:#5b564d; cursor:pointer; white-space:nowrap; }
+  .screen.dark .appbar .chip{ color:#abb2bf; }
+  .content{ flex:1; overflow-y:auto; overscroll-behavior:contain; padding:16px 26px 60px; }
+  .verse{ font-size:15px; line-height:1.7; margin:0 0 18px; cursor:text; }
+  .verse.hl{ background:linear-gradient(transparent 12%, rgba(200,162,74,.22) 12%, rgba(200,162,74,.22) 88%, transparent 88%); }
+  .screen.dark .verse.hl{ background:none; color:#e6c07b; }
+  ::selection{ background:#c8a24a55; }
+  /* hanging bookmark caret (variant A) */
+  .caret{ position:absolute; right:-14px; top:0; width:16px; cursor:pointer; color:#c9c2b2; font-size:15px; text-align:center; }
+  .screen.dark .caret{ color:#5c6370; }
+  .caret.on{ color:#c8a24a; }
+  .screen.dark .caret.on{ color:#e6c07b; }
+  /* margin rail chips (variant C) */
+  .versewrap{ position:relative; display:flex; gap:8px; margin:0 0 18px; }
+  .versewrap .versewrap-body{ flex:1; }
+  .rail{ width:16px; flex:0 0 16px; display:flex; flex-direction:column; gap:7px; align-items:center; padding-top:4px; }
+  .rail .mk{ width:14px; height:14px; cursor:pointer; border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:10.5px; }
+  .rail .mk.b{ color:#c8a24a; border:1.5px solid #c8a24a; border-radius:50%; transform:rotate(0deg); }
+  .screen.dark .rail .mk.b{ color:#e6c07b; border-color:#e6c07b; }
+  .rail .mk.h{ height:6px; border-radius:2px; background:#c8a24a; opacity:.6; }
+  .screen.dark .rail .mk.h{ background:#e6c07b; }
+  .rail .mk.n{ color:#5b564d; }
+  .screen.dark .rail .mk.n{ color:#98c379; }
+  .rail .add{ color:#b9b4aa; font-size:12px; cursor:pointer; height:14px; }
+  /* inline mark menu (variant A) */
+  .markmenu{ position:absolute; z-index:30; display:none; align-items:center; gap:2px;
+             background:#221f1a; color:#faf7f0; font-family:Verdana,sans-serif; font-size:11px;
+             padding:6px 8px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,.35); }
+  .screen.dark .markmenu{ background:#21252b; color:#abb2bf; }
+  .markmenu button{ background:none; border:none; color:inherit; font-family:Verdana,sans-serif; font-size:11px; cursor:pointer; padding:2px 6px; }
+  .markmenu button:hover{ color:#e6c07b; }
+  .screen.dark .markmenu button:hover{ color:#61afef; }
+  /* bottom band (variant B) */
+  .band{ position:absolute; left:0; right:0; bottom:0; display:none; gap:8px; justify-content:center;
+         padding:10px 12px 14px; background:linear-gradient(transparent, #faf7f0 40%); z-index:25; }
+  .screen.dark .band{ background:linear-gradient(transparent, #282c34 40%); }
+  .band.on{ display:flex; }
+  .band button{ background:#221f1a; color:#8a8272; border:none; font-family:Verdana,sans-serif; font-size:11px;
+                padding:8px 13px; border-radius:18px; cursor:pointer; }
+  .screen.dark .band button{ background:#21252b; border:1px solid #3e4451; }
+  /* marks drawer */
+  .drawer{ position:absolute; top:0; right:0; bottom:0; width:250px; background:#faf7f0; z-index:32;
+           border-left:1px solid #e4dfd2; box-shadow:-10px 0 30px rgba(0,0,0,.12);
+           transform:translateX(103%); transition:transform .3s cubic-bezier(.2,.8,.2,1);
+           display:flex; flex-direction:column; }
+  .screen.dark .drawer{ background:#21252b; border-left-color:#3e4451; box-shadow:-10px 0 30px rgba(0,0,0,.45); }
+  .drawer.on{ transform:translateX(0); }
+  .dhead{ padding:13px 14px 9px; font-family:Verdana,sans-serif; font-size:11px; color:#8a8272;
+          text-transform:uppercase; letter-spacing:.07em; display:flex; justify-content:space-between; align-items:center;
+          border-bottom:1px solid #e4dfd2; }
+  .screen.dark .dhead{ border-bottom-color:#3e4451; color:#5c6370; }
+  .dhead button{ background:none; border:none; font-size:14px; cursor:pointer; color:inherit; }
+  .dmarks{ flex:1; overflow-y:auto; padding:6px 0 14px; }
+  .markrow{ display:flex; gap:10px; padding:11px 14px; border-bottom:1px solid #e4dfd2; cursor:pointer; align-items:flex-start; }
+  .screen.dark .markrow{ border-bottom-color:#3e4451; }
+  .markrow .ico{ flex:0 0 18px; text-align:center; color:#c8a24a; font-size:13px; }
+  .screen.dark .markrow .ico{ color:#e6c07b; }
+  .markrow .body{ flex:1; }
+  .markrow .k{ display:block; font-family:Verdana,sans-serif; font-size:10px; color:#8a8272; text-transform:uppercase; letter-spacing:.06em; }
+  .screen.dark .markrow .k{ color:#5c6370; }
+  .markrow .ex{ display:block; font-size:12.5px; line-height:1.5; margin-top:2px; color:#333; }
+  .screen.dark .markrow .ex{ color:#abb2bf; }
+  .markrow .rm{ background:none; border:none; color:#b9b4aa; cursor:pointer; font-size:12px; }
+  /* note composer (ticket-22 sheet motif) */
+  .scrim{ position:absolute; inset:0; background:rgba(20,18,15,.45); opacity:0; pointer-events:none; transition:opacity .25s; z-index:20; }
+  .scrim.on{ opacity:1; pointer-events:auto; }
+  .sheet{ position:absolute; left:0; right:0; bottom:0; background:#faf7f0; border-radius:18px 18px 0 0;
+          padding:14px 18px 20px; z-index:21; transform:translateY(105%); transition:transform .3s cubic-bezier(.2,.8,.2,1);
+          box-shadow:0 -12px 40px rgba(0,0,0,.25); }
+  .screen.dark .sheet{ background:#21252b; }
+  .sheet.on{ transform:translateY(0); }
+  .grab{ width:36px; height:4px; border-radius:2px; background:#e4dfd2; margin:0 auto 10px; }
+  .screen.dark .grab{ background:#3e4451; }
+  .slab{ font-family:Verdana,sans-serif; font-size:11px; color:#8a8272; margin-bottom:8px; }
+  .screen.dark .slab{ color:#5c6370; }
+  .anchor{ font-size:11px; font-family:Verdana,sans-serif; color:#8a8272; line-height:1.6; margin-bottom:8px; }
+  .screen.dark .anchor{ color:#5c6370; }
+  .compose{ width:100%; min-height:84px; resize:none; border:1px solid #e4dfd2; border-radius:10px;
+            background:transparent; color:inherit; font-family:Georgia,serif; font-size:14px; line-height:1.55; padding:10px 12px; outline:none; }
+  .screen.dark .compose{ border-color:#3e4451; color:#abb2bf; }
+  .compose:focus{ border-color:#c8a24a; }
+  .sactions{ display:flex; align-items:center; gap:10px; margin-top:10px; }
+  .save{ background:#221f1a; color:#faf7f0; border:none; font-family:Verdana,sans-serif; font-size:12px; padding:9px 18px; border-radius:20px; cursor:pointer; }
+  .screen.dark .save{ background:#98c379; color:#21252b; }
+  .save:disabled{ opacity:.35; cursor:default; }
+  .cancelb{ background:none; border:none; font-family:Verdana,sans-serif; font-size:12px; color:#8a8272; cursor:pointer; }
+  .screen.dark .cancelb{ color:#5c6370; }
+  /* shell */
+  .floatbar{
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:8px; background:#111; color:#faf7f0;
+    padding:9px 12px; border-radius:26px; box-shadow:0 10px 30px rgba(0,0,0,.55);
+    font-family:Verdana,sans-serif; font-size:12px; z-index:50;
+  }
+  .floatbar button{ background:none; border:none; color:#faf7f0; font-size:16px; cursor:pointer; padding:2px 8px; }
+  .floatbar .vlabel{ min-width:225px; text-align:center; }
+  .floatbar .pickbtn{ font-size:12px; }
+  .floatbar .pickbtn.picked{ color:#c8a24a; }
+  .state{ margin-top:14px; color:#b9b4aa; font-family:Verdana,sans-serif; font-size:11px; max-width:640px; text-align:center; line-height:1.7; }
+  .state .picks{ color:#c8a24a; }
+  .toast{ position:absolute; left:50%; bottom:16px; transform:translateX(-50%) translateY(8px);
+          background:#221f1a; color:#faf7f0; font-family:Verdana,sans-serif; font-size:11px;
+          padding:8px 14px; border-radius:18px; opacity:0; transition:all .3s; z-index:40; pointer-events:none; white-space:nowrap; }
+  .screen.dark .toast{ background:#61afef; color:#21252b; }
+  .toast.on{ opacity:.96; transform:translateX(-50%) translateY(0); }
+  .toggletheme{ position:fixed; top:14px; right:16px; background:#111; color:#faf7f0; border:none;
+                 font-family:Verdana,sans-serif; font-size:11px; padding:7px 12px; border-radius:16px; cursor:pointer; z-index:60; }
+</style>
+</head>
+<body>
+<div class="proto-tag">Eruditio · reader annotations — PROTOTYPE (throwaway) · ticket 26</div>
+<div class="phone">
+  <div class="screen" id="screen">
+    <div class="appbar">
+      <span><span class="bk">←</span> Crito · <span id="pos">line 1</span></span>
+      <span class="chip" id="marksChip" data-act="drawer">✍ marks · 4</span>
+    </div>
+    <div class="content" id="content"></div>
+    <div class="markmenu" id="markmenu"></div>
+    <div class="band" id="band"></div>
+    <div class="drawer" id="drawer"></div>
+    <div class="scrim" id="scrim"></div>
+    <div class="sheet" id="sheet"></div>
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+<div class="floatbar">
+  <button id="btnPrev">◀</button><span class="vlabel" id="vlabel"></span><button id="btnNext">▶</button>
+  <button class="pickbtn" id="pickbtn">✓ pick</button>
+</div>
+<div class="state" id="state"></div>
+<button class="toggletheme" id="toggletheme">dark</button>
+<script>
+const TEXTS = [
+  'Men of Athens, I am surprised at this, for I am far advanced in years and near the end of the road, yet you call me back to weigh a matter of moments.',
+  'The many have told me you were going to be brought to trial, and I resolved to hold back until the day itself, only to find you summoned before the dawn to the archon by the door of the prison.',
+  'If it were right, Crito, that men of my age should hesitate between sleeping and waking, I wonder what counsel we would reach; but it is not so, and here we both stand, deliberating.',
+  'Then tell me plainly: do we say that one must never, in any way, willingly do wrong? Or does it depend sometimes on one thing and sometimes on another?',
+  'And if, going under the wall when the officers keep watch, we escape from here, shall we have done wrong all the while a greater thing was owed?'
+];
+const ICON = { bookmark:'◇', highlight:'▬', note:'¶' };
+const KIND_LABEL = { bookmark:'Bookmark', highlight:'Highlight', note:'Note' };
+const VARIANTS = ['A selection', 'B band', 'C rail'];
+
+let marks = [
+  { id:'m1', kind:'bookmark',  para:1, ex:'I am far advanced in years' },
+  { id:'m2', kind:'highlight', para:2, ex:'The many have told me you were going to be brought to trial' },
+  { id:'m3', kind:'note',      para:3, ex:'never willingly do wrong — hold against the next chapter' },
+  { id:'m4', kind:'highlight', para:4, ex:'Or does it depend sometimes on one thing and sometimes on another?' }
+];
+let selection = null;    // {para, text}
+let noteTarget = null;   // para the composer is anchored at
+let pick = null;
+let variant = 'A selection';
+let topPara = 0;
+
+const $ = (id) => document.getElementById(id);
+
+function saveUrl(){
+  const p = new URLSearchParams({ page:'marks', v:variant });
+  if (pick) p.set('pick', pick);
+  history.replaceState(null, '', '?' + p.toString());
+}
+function countsBy(){
+  const has = {};
+  marks.forEach(m => has[m.kind] = (has[m.kind] || 0) + 1);
+  return Object.entries(has).map(([k, n]) => n + ' ' + k).join(', ') || 'none';
+}
+function setState(save){
+  $('state').innerHTML =
+    'variant <b>' + variant + '</b> · selection: ' +
+    (selection ? '“' + selection.text.slice(0, 30) + (selection.text.length > 30 ? '…' : '') + '”' : 'none') +
+    ' · marks: ' + countsBy() +
+    (pick ? ' · pick: <span class="picks">✓ ' + pick + '</span>' : '');
+  if (save) saveUrl();
+}
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 1600);
+}
+
+function paragraphs(v){
+  const selMode = v.startsWith('A');
+  const railMode = v.startsWith('C');
+  return TEXTS.map((tx, i) => {
+    const owned = marks.filter(m => m.para === i);
+    const hl = owned.some(m => m.kind === 'highlight');
+    const bm = owned.some(m => m.kind === 'bookmark');
+    const caret = selMode ? '<span class="caret' + (bm ? ' on' : '') + '" data-caret="' + i + '">◇</span>' : '';
+    const verse = '<div class="verse' + (hl ? ' hl' : '') + '" data-para="' + i + '" id="p' + i + '">' + caret + tx + '</div>';
+    if (!railMode) return verse;
+    const chips = owned.map(m =>
+      '<span class="mk ' + m.kind[0] + '" data-jump="' + m.id + '" title="' + KIND_LABEL[m.kind] + '">' +
+      (m.kind === 'note' ? ICON.note : (m.kind === 'bookmark' ? '' : '')) + '</span>').join('');
+    return '<div class="versewrap">' +
+      '<div class="versewrap-body">' + verse + '</div>' +
+      '<div class="rail" data-railline="' + i + '">' + chips +
+      '<span class="add" data-railline="' + i + '">+</span></div></div>';
+  }).join('');
+}
+
+function render(){
+  const v = variant;
+  $('content').innerHTML = paragraphs(v);
+  $('marksChip').textContent = '✍ marks · ' + marks.length;
+  const band = $('band');
+  if (v.startsWith('B')) {
+    band.classList.add('on');
+    band.innerHTML =
+      '<button data-b="bookmark">◇ Bookmark</button>' +
+      '<button data-b="highlight">▬ Highlight</button>' +
+      '<button data-b="note">¶ Note</button>' +
+      '<button data-b="drawer">Marks</button>';
+  } else {
+    band.classList.remove('on');
+  }
+  $('markmenu').style.display = 'none';
+  renderDrawer();
+  setState(true);
+}
+
+function openNote(target){
+  noteTarget = target;
+  const ctx = target.text ? '“' + target.text.slice(0, 60) + (target.text.length > 60 ? '…' : '') + '”' : 'line ' + (target.para + 1);
+  $('sheet').innerHTML =
+    '<div class="grab"></div>' +
+    '<div class="slab">Note · line ' + (target.para + 1) + '</div>' +
+    (target.text ? '<div class="anchor">' + ctx + '</div>' : '') +
+    '<textarea class="compose" id="noteText" placeholder="A short note in your own words…"></textarea>' +
+    '<div class="sactions"><button class="save" id="noteSave">Save</button>' +
+    '<button class="cancelb" id="noteCancel">Discard</button></div>';
+  $('scrim').classList.add('on');
+  $('sheet').classList.add('on');
+  $('noteText').focus();
+  $('noteSave').addEventListener('click', () => {
+    const val = $('noteText').value.trim();
+    if (!val) return;
+    marks.push({ id:'m' + Date.now(), kind:'note', para:noteTarget.para, ex:val });
+    render(); toast('note saved · line ' + (noteTarget.para + 1));
+    closeSheet();
+  });
+  $('noteCancel').addEventListener('click', closeSheet);
+}
+function closeSheet(){
+  $('scrim').classList.remove('on'); $('sheet').classList.remove('on'); noteTarget = null;
+}
+
+function renderDrawer(){
+  const sorted = marks.slice().sort((a, b) => a.para - b.para);
+  $('drawer').innerHTML =
+    '<div class="dhead"><span>marks in this text</span><button data-act="closeDraw">✕</button></div>' +
+    '<div class="dmarks">' + (sorted.length ? sorted.map(m =>
+      '<div class="markrow" data-jump="' + m.id + '">' +
+      '<span class="ico">' + ICON[m.kind] + '</span>' +
+      '<span class="body"><span class="k">' + KIND_LABEL[m.kind] + ' · line ' + (m.para + 1) + '</span>' +
+      '<span class="ex">' + m.ex + '</span></span>' +
+      '<button class="rm" data-rm="' + m.id + '">✕</button>' +
+      '</div>').join('') : '<div style="padding:18px 14px;font-size:12.5px;color:#8a8272">No marks yet in this text.</div>') + '</div>';
+}
+
+function captureSelection(){
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return null;
+  const node = sel.anchorNode && sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
+  const paraEl = node && node.closest ? node.closest('.verse') : null;
+  const text = sel.toString() && sel.toString().replace(/\s+/g, ' ').trim();
+  if (!paraEl || !text) return null;
+  return { para:+paraEl.dataset.para, text:text.slice(0, 120) };
+}
+function dropSelection(){ state_clearSel(); render(); }
+function state_clearSel(){ window.getSelection().removeAllRanges(); selection = null; }
+
+function markmenuFor(target){
+  const m = $('markmenu');
+  m.innerHTML =
+    '<button data-mm="highlight">▬ Highlight</button>' +
+    '<button data-mm="note">¶ Note</button>' +
+    '<button data-mm="drop">✕</button>';
+  m.style.display = 'flex';
+  const box = $('content').getBoundingClientRect();
+  const pv = $('p' + target.para).getBoundingClientRect();
+  m.style.left = Math.max(6, Math.min(232, pv.left - box.left + 24)) + 'px';
+  m.style.top = (pv.top - box.top - 32) + 'px';
+}
+
+$('content').addEventListener('mouseup', () => {
+  setTimeout(() => {
+    const sel = captureSelection();
+    if (variant.startsWith('A')) {
+      selection = sel;
+      if (sel) { markmenuFor(sel); toast('selection in hand'); } else { $('markmenu').style.display = 'none'; }
+    } else {
+      if (sel) selection = sel;
+      else if (selection) { /* keep last selection for the band */ }
+    }
+    setState(false);
+    if (variant.startsWith('B') && sel) toast('selection captured · apply from the band');
+    if (variant.startsWith('C') && sel) toast('selection in hand · tap the rail + on that line');
+  }, 10);
+});
+
+$('screen').addEventListener('click', (e) => {
+  const t = e.target;
+  const caret = t.closest && t.closest('[data-caret]');
+  if (caret) {
+    const i = +caret.dataset.caret;
+    const has = marks.some(m => m.kind === 'bookmark' && m.para === i);
+    if (has) { marks = marks.filter(m => !(m.kind === 'bookmark' && m.para === i)); toast('bookmark removed · line ' + (i + 1)); }
+    else { marks.push({ id:'m' + Date.now(), kind:'bookmark', para:i, ex:'top of line ' + (i + 1) }); toast('bookmark saved · line ' + (i + 1)); }
+    render(); return;
+  }
+  const mm = t.closest && t.closest('[data-mm]');
+  if (mm) {
+    const kind = mm.dataset.mm;
+    if (kind === 'drop' || !selection) { $('markmenu').style.display = 'none'; dropSelection(); return; }
+    if (kind === 'note') { openNote(selection); $('markmenu').style.display = 'none'; state_clearSel(); setState(true); return; }
+    const dup = marks.some(m => m.kind === 'highlight' && m.para === selection.para && selection.text.startsWith(m.ex.slice(0, 24)));
+    if (dup) { toast('this span is already highlighted'); return; }
+    marks.push({ id:'m' + Date.now(), kind:'highlight', para:selection.para, ex:selection.text });
+    $('markmenu').style.display = 'none';
+    toast('highlight saved · line ' + (selection.para + 1));
+    state_clearSel(); render(); return;
+  }
+  const railAdd = t.closest && t.closest('[data-railline]');
+  if (railAdd) { openNote({ para:+railAdd.dataset.railline, text:selection && selection.para === +railAdd.dataset.railline ? selection.text : '' }); return; }
+  const jump = t.closest && t.closest('[data-jump]');
+  if (jump) {
+    const m = marks.find(x => x.id === jump.dataset.jump);
+    if (m) { $('content').scrollTop = $('p' + m.para).offsetTop - 20; $('pos').textContent = 'line ' + (m.para + 1); toast('jumped to line ' + (m.para + 1)); }
+    $('drawer').classList.remove('on'); return;
+  }
+  const rm = t.closest && t.closest('[data-rm]');
+  if (rm) { marks = marks.filter(m => m.id !== rm.dataset.rm); render(); toast('mark removed'); return; }
+  if (t.closest('[data-act="drawer"]')) { renderDrawer(); $('drawer').classList.add('on'); return; }
+  if (t.closest('[data-act="closeDraw"]')) { $('drawer').classList.remove('on'); return; }
+  if (t.closest('.scrim')) { closeSheet(); return; }
+  const b = t.closest && t.closest('[data-b]');
+  if (b) {
+    const kind = b.dataset.b;
+    if (kind === 'drawer') { renderDrawer(); $('drawer').classList.add('on'); return; }
+    const target = selection || { para:topPara, text:'' };
+    if (kind === 'note') { openNote(target); return; }
+    marks.push({ id:'m' + Date.now(), kind, para:target.para, ex:target.text.slice(0, 44) || ('top of line ' + (target.para + 1)) });
+    toast(KIND_LABEL[kind] + ' saved · line ' + (target.para + 1));
+    state_clearSel(); render(); return;
+  }
+});
+
+// variant switcher + pick
+function renderFloat(){
+  $('vlabel').textContent = variant;
+  $('pickbtn').textContent = pick ? '✓ picked' : '✓ pick';
+  $('pickbtn').classList.toggle('picked', !!pick);
+}
+function step(d){
+  const i = (VARIANTS.indexOf(variant) + d + VARIANTS.length) % VARIANTS.length;
+  variant = VARIANTS[i]; renderFloat(); render();
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') step(1);
+  if (e.key === 'ArrowLeft') step(-1);
+});
+$('btnPrev').addEventListener('click', () => step(-1));
+$('btnNext').addEventListener('click', () => step(1));
+$('pickbtn').addEventListener('click', () => { pick = variant; saveUrl(); renderFloat(); setState(false); });
+$('toggletheme').addEventListener('click', () => $('screen').classList.toggle('dark'));
+
+(function boot(){
+  const q = new URLSearchParams(location.search);
+  const qv = q.get('v');
+  if (qv && VARIANTS.includes(qv)) variant = qv;
+  if (q.get('pick')) pick = q.get('pick');
+  renderFloat(); render();
+})();
+</script>
+</body>
+</html>

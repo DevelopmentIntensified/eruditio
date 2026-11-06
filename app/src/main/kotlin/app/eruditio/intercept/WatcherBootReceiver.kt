@@ -14,8 +14,11 @@ class WatcherBootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED ->
+            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
+                WatcherRuntime.log("receiver: ${intent.action} — arming")
                 WatcherRuntime.arm(context)
+            }
+            else -> Unit
         }
     }
 }

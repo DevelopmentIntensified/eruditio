@@ -35,6 +35,20 @@ android {
         versionName = "1.0"
     }
 
+    flavorDimensions += "distribution"
+    productFlavors {
+        // F-Droid build: core loop unlocked, no Play Billing (proprietary).
+        // F-Droid Inclusion Policy rejects Play Billing; see metadata
+        // MaintainerNotes. The play flavor keeps the store purchase.
+        create("foss") {
+            dimension = "distribution"
+        }
+        // Google Play build: one-time purchase unlocks the core loop.
+        create("play") {
+            dimension = "distribution"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -82,7 +96,8 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.10.0")
 
     // One-time billing; no subscriptions, no ads, no third-party SDKs (spec).
-    implementation("com.android.billingclient:billing-ktx:8.3.0")
+    // Play flavor only: F-Droid forbids the proprietary Play Billing client.
+    add("playImplementation", "com.android.billingclient:billing-ktx:8.3.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")

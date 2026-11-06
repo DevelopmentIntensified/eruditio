@@ -19,8 +19,9 @@ class Converters {
         InterceptionEntity::class,
         LedgerEntity::class,
         EntitlementEntity::class,
+        AnnotationEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -31,6 +32,7 @@ abstract class EruditioDatabase : RoomDatabase() {
     abstract fun interceptionDao(): InterceptionDao
     abstract fun ledgerDao(): LedgerDao
     abstract fun entitlementDao(): EntitlementDao
+    abstract fun annotationDao(): AnnotationDao
 
     companion object {
         /** v2: per-session reading time (progress "time learning, not scrolling"). */
@@ -103,9 +105,30 @@ abstract class EruditioDatabase : RoomDatabase() {
             }
         }
 
+        /** v7: reader annotations (tickets 26→27) — bookmarks, highlights, notes,
+         *  per text, anchored in the normalized character space. Purely additive:
+         *  no existing table changes shape. */
+        private val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS annotations (" +
+                        "id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, " +
+                        "textId TEXT NOT NULL, " +
+                        "kind TEXT NOT NULL, " +
+                        "startChar INTEGER NOT NULL, " +
+                        "endChar INTEGER NOT NULL, " +
+                        "noteText TEXT, " +
+                        "createdAtMillis INTEGER NOT NULL)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_annotations_textId ON annotations(textId)",
+                )
+            }
+        }
+
         fun build(context: Application): EruditioDatabase =
             Room.databaseBuilder(context, EruditioDatabase::class.java, "eruditio.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
     }
 }

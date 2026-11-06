@@ -20,8 +20,14 @@ class WatcherWatchdog(context: Context, params: WorkerParameters) : Worker(conte
 
     override fun doWork(): Result {
         val context = applicationContext
-        if (WatcherRuntime.status(context).fault != InterceptionFault.NOT_RUNNING) return Result.success()
-        return if (WatcherRuntime.tryStartWatcher(context)) Result.success() else Result.retry()
+        val status = WatcherRuntime.status(context)
+        if (status.fault != InterceptionFault.NOT_RUNNING) {
+            WatcherRuntime.log("watchdog: healthy (${status.fault}), nothing to do")
+            return Result.success()
+        }
+        val started = WatcherRuntime.tryStartWatcher(context)
+        WatcherRuntime.log("watchdog: stale beat, start $started")
+        return if (started) Result.success() else Result.retry()
     }
 
     companion object {
@@ -31,11 +37,19 @@ class WatcherWatchdog(context: Context, params: WorkerParameters) : Worker(conte
 
         /** Idempotent: the OS keeps one watchdog no matter how often we arm. */
         fun schedule(context: Context) {
-            val request = PeriodicWorkRequestBuilder<WatcherWatchdog>(INTERVAL_MINUTES, TimeUnit.MINUTES)
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_MINUTES, TimeUnit.MINUTES)
-                .build()
-            WorkManager.getInstance(context)
-                .enqueueUniquePeriodicWork(UNIQUE_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+            try {
+                val request =
+                    PeriodicWorkRequestBuilder<WatcherWatchdog>(INTERVAL_MINUTES, TimeUnit.MINUTES)
+                        .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_MINUTES, TimeUnit.MINUTES)
+                        .build()
+                WorkManager.getInstance(context)
+                    .enqueueUniquePeriodicWork(UNIQUE_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+                WatcherRuntime.log("watchdog scheduled")
+            } catch (e: IllegalStateException) {
+                // WorkManager not initialised in this process: the service start
+                // is the load-bearing half of arming, so say so and move on.
+                WatcherRuntime.log("watchdog schedule failed: ${e.message}")
+            }
         }
     }
 }

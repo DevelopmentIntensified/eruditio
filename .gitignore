@@ -10,6 +10,7 @@ captures/
 .cxx/
 keystore/
 keystore.properties
+*.apk
 # scratch working files from the text-library fetch session (tools/ scripts are tracked)
 tools/pg_catalog.csv
 tools/catalog.rdf.bz2

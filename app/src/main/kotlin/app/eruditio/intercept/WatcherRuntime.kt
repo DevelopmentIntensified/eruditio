@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.os.PowerManager
 import android.os.Process
+import android.util.Log
 
 /**
  * The Android-facing half of watcher liveness: the heartbeat the running
@@ -60,20 +61,32 @@ object WatcherRuntime {
      */
     fun tryStartWatcher(context: Context): Boolean = try {
         context.startForegroundService(Intent(context, UsageStatsWatcherService::class.java))
+        Log.i(TAG, "watcher start allowed")
         true
     } catch (e: ForegroundServiceStartNotAllowedException) {
+        Log.w(TAG, "watcher start refused: ${e.message}")
         false
     } catch (e: IllegalStateException) {
+        Log.w(TAG, "watcher start refused (state): ${e.message}")
         false
     } catch (e: SecurityException) {
+        Log.w(TAG, "watcher start refused (permission): ${e.message}")
         false
     }
 
-    /** Arm "always on": the watcher itself plus the watchdog that revives it. */
+    /**
+     * Arm "always on": the watchdog plus the watcher itself. The watchdog is
+     * armed first so a refused service start can never leave us unwatched,
+     * and a WorkManager failure can never cost us the service start.
+     */
     fun arm(context: Context) {
-        tryStartWatcher(context)
         WatcherWatchdog.schedule(context)
+        tryStartWatcher(context)
     }
+
+    internal fun log(message: String) = Log.i(TAG, message)
+
+    internal const val TAG = "Eruditio/watcher"
 
     private fun prefs(context: Context): SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)

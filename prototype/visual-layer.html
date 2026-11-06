@@ -1,0 +1,423 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Not production code. Eruditio visual layer (ticket 16 → 17):
+  owner picked ALL FOUR directions; each gets structural variants to judge before Compose.
+
+  Q1 (page=dials):     What does a per-text reading dial look like on a library row?
+     A quarters dial · B checkpoint dots (ties to gutter motif) · C spine fill · D plain ring (today)
+  Q2 (page=week):      What does the week strip of session dots on Progress look like?
+     A quiet dots · B streak head · C volume bars · D linked path
+  Q3 (page=signature): Which checkpoint treatment becomes the app's visual signature?
+     A quiet marks · B breathing marks · C instrument column · D diamond marks
+  Q4 (page=plates):    How do bundled SVG plates (maps/timelines) surface for the ancient track?
+     A chapter plate in reader · B library badge gallery · C post-session artifact
+
+  Switch pages with the tabs, variants with the floating bar (or ← → keys).
+  "✓ pick" records a verdict; picks + page + variant persist in the URL.
+  State is printed under the phone after every interaction.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eruditio — visual layer (prototype)</title>
+<style>
+  :root{ --frame-w:390px; --frame-h:760px; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    font-family:Georgia,'Times New Roman',serif; background:#2b2a27; color:#111;
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding:26px 12px 120px;
+  }
+  .proto-tag{ color:#b9b4aa; font-family:Verdana,sans-serif; font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:12px; }
+  .phone{ width:var(--frame-w); height:var(--frame-h); border-radius:38px; padding:14px 10px; background:#0d0d0c; box-shadow:0 22px 60px rgba(0,0,0,.5); }
+  .screen{ width:100%; height:100%; border-radius:30px; overflow:hidden; background:#faf7f0; display:flex; flex-direction:column; position:relative; }
+  .screen.dark{ background:#282c34; color:#abb2bf; }
+  .appbar{ padding:14px 18px 10px; font-size:12px; color:#8a8272; border-bottom:1px solid #e4dfd2; font-family:Verdana,sans-serif; }
+  .screen.dark .appbar{ border-bottom-color:#3e4451; color:#5c6370; }
+  .content{ flex:1; overflow-y:auto; overscroll-behavior:contain; padding:0 18px 24px; }
+  h1.title{ font-size:24px; margin:16px 0 4px; }
+  .byline{ font-size:12px; color:#8a8272; margin-bottom:14px; }
+  .screen.dark .byline{ color:#5c6370; }
+  p.para{ font-size:15px; line-height:1.65; margin:0 0 14px; position:relative; }
+  /* library rows */
+  .row{ display:flex; align-items:center; justify-content:space-between; gap:12px;
+        padding:10px 2px; border-bottom:1px solid #e4dfd2; cursor:pointer; }
+  .screen.dark .row{ border-bottom-color:#3e4451; }
+  .row .t{ font-size:15px; } .row .a{ font-size:11px; color:#8a8272; margin-top:2px; }
+  .screen.dark .row .a{ color:#5c6370; }
+  .row .grp{ font-size:10px; font-family:Verdana,sans-serif; color:#8a8272; text-transform:uppercase; letter-spacing:.06em; margin-top:3px; }
+  .dialbox{ flex:0 0 46px; display:flex; align-items:center; justify-content:center; }
+  /* progress card */
+  .card{ border:1px solid #e4dfd2; border-radius:12px; padding:14px; margin:12px 0; background:transparent; }
+  .screen.dark .card{ border-color:#3e4451; }
+  .card .lab{ font-size:10px; font-family:Verdana,sans-serif; text-transform:uppercase; letter-spacing:.07em; color:#8a8272; margin-bottom:8px; }
+  .screen.dark .card .lab{ color:#5c6370; }
+  /* week strip */
+  .weekdots{ display:flex; gap:14px; align-items:flex-end; }
+  .wd{ display:flex; flex-direction:column; align-items:center; gap:5px; cursor:pointer; }
+  .wd .d{ width:14px; height:14px; border-radius:50%; border:1.5px solid #c9c2b2; background:transparent; transition:all .25s; }
+  .screen.dark .wd .d{ border-color:#5c6370; }
+  .wd.done .d{ background:#221f1a; border-color:#221f1a; }
+  .screen.dark .wd.done .d{ background:#61afef; border-color:#61afef; }
+  .wd.today .d{ border-color:#c8a24a; box-shadow:0 0 0 2px rgba(200,162,74,.25); }
+  .wd .l{ font-size:9px; font-family:Verdana,sans-serif; color:#8a8272; text-transform:uppercase; }
+  .screen.dark .wd .l{ color:#5c6370; }
+  .streakhead{ display:flex; align-items:center; gap:16px; }
+  .streakhead .n{ font-size:34px; line-height:1; } .streakhead .u{ font-size:10px; color:#8a8272; font-family:Verdana,sans-serif; text-transform:uppercase; letter-spacing:.07em; margin-top:3px; }
+  .vbars{ display:flex; gap:10px; align-items:flex-end; height:64px; }
+  .vb{ display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; }
+  .vb .b{ width:12px; border-radius:3px 3px 0 0; background:#e4dfd2; }
+  .screen.dark .vb .b{ background:#3e4451; }
+  .vb.done .b{ background:#221f1a; } .screen.dark .vb.done .b{ background:#61afef; }
+  .vb .d{ width:6px; height:6px; border-radius:50%; background:transparent; border:1px solid transparent; }
+  .vb.done .d{ background:#c8a24a; border-color:#c8a24a; }
+  .pathdots{ display:flex; align-items:center; }
+  .pd{ width:14px; height:14px; border-radius:50%; border:1.5px solid #e4dfd2; background:transparent; flex:0 0 auto; cursor:pointer; }
+  .screen.dark .pd{ border-color:#5c6370; }
+  .pd.done{ background:#221f1a; border-color:#221f1a; } .screen.dark .pd.done{ background:#61afef; border-color:#61afef; }
+  .pd.today{ border-color:#c8a24a; }
+  .link{ height:1.5px; background:#221f1a; flex:1 1 14px; min-width:10px; }
+  .screen.dark .link{ background:#61afef; }
+  .link.brk{ background:transparent; border-top:1.5px dashed #e4dfd2; }
+  .screen.dark .link.brk{ border-color:#3e4451; }
+  /* checkpoint signature variants */
+  .mark{ position:absolute; left:-16px; top:7px; width:9px; height:9px; border-radius:50%;
+         background:#e4dfd2; transition:all .3s; }
+  .screen.dark .mark{ background:#3e4451; }
+  .mark.near{ background:#221f1a; transform:scale(1.35); }
+  .screen.dark .mark.near{ background:#61afef; }
+  .mark.breathe{ background:#c8a24a; animation:breathe 1.6s ease-in-out infinite; }
+  .mark.diamond{ border-radius:1px; transform:rotate(45deg) scale(.9); background:#c8a24a; opacity:.75; }
+  .mark.diamond.near{ opacity:1; transform:rotate(45deg) scale(1.3); }
+  @keyframes breathe{ 0%,100%{ transform:scale(1); box-shadow:0 0 0 0 rgba(200,162,74,.5);} 50%{ transform:scale(1.25); box-shadow:0 0 0 5px rgba(200,162,74,0);} }
+  .scalecol{ position:absolute; left:-13px; top:0; bottom:0; width:7px; }
+  .scalecol .line{ position:absolute; left:3px; top:0; bottom:0; width:1.5px; background:#e4dfd2; }
+  .screen.dark .scalecol .line{ background:#3e4451; }
+  .scalecol .tick{ position:absolute; left:0; width:7px; height:1.5px; background:#c8a24a; opacity:.5; }
+  .scalecol .tick.passed{ opacity:1; }
+  .scalecol .needle{ position:absolute; left:0; width:7px; height:7px; border-radius:50%; background:#221f1a; margin-top:-3px; }
+  .screen.dark .scalecol .needle{ background:#61afef; }
+  .pause-chip{
+    position:sticky; bottom:10px; margin:0 auto 6px; width:max-content;
+    background:#221f1a; color:#faf7f0; font-family:Verdana,sans-serif; font-size:11px;
+    padding:7px 14px; border-radius:20px; cursor:pointer; opacity:.95; display:none;
+  }
+  .screen.dark .pause-chip{ background:#61afef; color:#21252b; }
+  /* plates */
+  .platefig{ border:1px solid #e4dfd2; border-radius:10px; padding:10px; margin:14px 0; cursor:pointer; background:rgba(255,255,255,.35); }
+  .screen.dark .platefig{ border-color:#3e4451; background:rgba(0,0,0,.15); }
+  .platefig .cap{ font-size:10px; font-family:Verdana,sans-serif; text-transform:uppercase; letter-spacing:.07em; color:#8a8272; margin-top:8px; }
+  .screen.dark .platefig .cap{ color:#5c6370; }
+  .badge{ font-size:10px; font-family:Verdana,sans-serif; border:1px solid #c8a24a; color:#a5822f;
+          border-radius:10px; padding:3px 8px; cursor:pointer; flex:0 0 auto; }
+  .screen.dark .badge{ color:#61afef; border-color:#61afef; }
+  .overlay{ position:absolute; inset:0; background:rgba(20,18,15,.86); display:none;
+            align-items:center; justify-content:center; flex-direction:column; gap:10px; padding:24px; }
+  .overlay .cardw{ background:#faf7f0; border-radius:14px; padding:16px; max-width:320px; }
+  .screen.dark .overlay .cardw{ background:#21252b; }
+  .galnav{ display:flex; gap:8px; margin-top:10px; }
+  .gal{ width:9px; height:9px; border-radius:50%; background:#5c6370; cursor:pointer; }
+  .gal.on{ background:#faf7f0; }
+  .artifact{ display:flex; gap:12px; align-items:center; }
+  .artifact .th{ flex:0 0 84px; }
+  /* shell */
+  .floatbar{
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:8px; background:#111; color:#faf7f0;
+    padding:9px 12px; border-radius:26px; box-shadow:0 10px 30px rgba(0,0,0,.55);
+    font-family:Verdana,sans-serif; font-size:12px; z-index:50;
+  }
+  .floatbar button{ background:none; border:none; color:#faf7f0; font-size:16px; cursor:pointer; padding:2px 8px; }
+  .floatbar .vlabel{ min-width:210px; text-align:center; }
+  .pagetabs{ display:flex; gap:4px; margin-left:6px; }
+  .pagetabs div{ padding:4px 9px; border-radius:14px; cursor:pointer; font-size:11px; color:#b9b4aa; }
+  .pagetabs div.on{ background:#faf7f0; color:#111; }
+  .state{ margin-top:14px; color:#b9b4aa; font-family:Verdana,sans-serif; font-size:11px; max-width:640px; text-align:center; line-height:1.6; }
+  .state .picks{ color:#c8a24a; }
+  .pickchip{ position:absolute; top:10px; right:12px; font-size:10px; font-family:Verdana,sans-serif;
+             border:1px solid #c8a24a; color:#a5822f; background:rgba(255,255,255,.5);
+             border-radius:12px; padding:4px 10px; cursor:pointer; z-index:10; }
+  .screen.dark .pickchip{ color:#61afef; border-color:#61afef; background:rgba(0,0,0,.3); }
+  .pickchip.picked{ background:#c8a24a; color:#fff; border-color:#c8a24a; }
+  .toggletheme{ position:fixed; top:14px; right:16px; background:#111; color:#faf7f0; border:none;
+                 font-family:Verdana,sans-serif; font-size:11px; padding:7px 12px; border-radius:16px; cursor:pointer; z-index:60; }
+</style>
+</head>
+<body>
+<div class="proto-tag">Eruditio · visual layer — PROTOTYPE (throwaway) · all four owner directions</div>
+<div class="phone">
+  <div class="screen" id="screen">
+    <div class="appbar" id="appbar">…</div>
+    <div class="content" id="content"></div>
+    <button class="pickchip" id="pickchip">✓ pick this</button>
+  </div>
+</div>
+<button class="toggletheme" id="toggletheme">◐ dark</button>
+<div class="floatbar">
+  <button id="prev">←</button>
+  <span id="vlabel">…</span>
+  <button id="next">→</button>
+  <div class="pagetabs" id="pagetabs"></div>
+</div>
+<div class="state" id="state">…</div>
+
+<script>
+/* ---------- shell state ---------- */
+const el=id=>document.getElementById(id);
+const screenEl=el("screen"), content=el("content");
+const params=new URLSearchParams(location.search);
+const PICK_KEYS=["dials","week","signature","plates"];
+let page=params.get("page")||"dials";
+let variant=params.get("variant")||"A";
+let dark=false;
+let picks={}; (params.get("picks")||"").split(",").filter(Boolean).forEach(p=>{const[k,v]=p.split(":"); if(PICK_KEYS.includes(k))picks[k]=v;});
+function param(k,v){ params.set(k,v); history.replaceState(null,"",`?${params}`); }
+
+/* sample data */
+const EXCERPT=[
+  "Socrates. Why, Crito, I should be sorry to attach weight to the opinion of the many; the wise are few, and their judgment alone has weight.",
+  "Crito. Yet, Socrates, the many can do the greatest harm to one who is condemned, and the greatest good as well.",
+  "Socrates. Would that the many could do the greatest harm, and the greatest good — then life would be worth living. But as it is, they can do neither.",
+  "Crito. Then you do not fear the opinion of the crowd, which says that you have abandoned your friends.",
+  "Socrates. Let us not attend to the crowd, but to the one who understands justice and injustice — the one, if such there be.",
+  "Crito. That is your old argument, Socrates. But consider: if you die, I lose a friend the like of whom I shall never see again.",
+  "Socrates. The important thing is not life, but the good life — and the good life is the same as the beautiful and the just.",
+  "Crito. Then you will not go with us tonight, whatever we say?",
+  "Socrates. I have thought of it long, dear friend, and the answer does not change with the hour.",
+];
+const CHECK_EVERY=4; // prototype spacing: 4 paragraphs ≙ every 12 items in the app
+const WEEK=[
+  {d:"Mon",min:0,done:false},{d:"Tue",min:12,done:true},{d:"Wed",min:9,done:true},
+  {d:"Thu",min:22,done:true},{d:"Fri",min:6,done:true},{d:"Sat",min:12,done:true},{d:"Sun",min:0,done:false,today:true},
+];
+const LIB=[
+  {t:"Apology",a:"Plato · Jowett",g:"classics",pct:100},
+  {t:"Crito",a:"Plato · Jowett",g:"classics",pct:37},
+  {t:"Meno",a:"Plato · Jowett",g:"classics",pct:12},
+  {t:"Meditations",a:"Marcus Aurelius",g:"classics",pct:0},
+  {t:"Practice of the Presence of God",a:"Brother Lawrence",g:"christian",pct:64},
+  {t:"Sermons: Talks to Farmers",a:"Spurgeon",g:"christian",pct:0},
+  {t:"Imitation of Christ",a:"Thomas à Kempis",g:"christian",pct:100},
+  {t:"Sowe the Seed",a:"missionary bio",g:"biography",pct:45},
+];
+
+/* ---------- inline SVG plates (schematic, prototype) ---------- */
+function mapSVG(w){
+  return `<svg viewBox="0 0 320 200" width="${w}" xmlns="http://www.w3.org/2000/svg" style="display:block">
+    <rect x="2" y="2" width="316" height="196" fill="none" stroke="#8a8272" stroke-width="1"/>
+    <path d="M6 40 Q40 18 78 30 Q120 42 150 30 Q180 20 196 44 L196 60 Q160 70 130 62 Q90 72 60 64 Q30 66 6 58 Z" fill="#f0ead9" stroke="#8a8272" stroke-width="1"/>
+    <path d="M214 14 Q246 10 268 22 Q292 36 312 30 L314 60 Q280 66 250 58 Q222 52 210 60 L208 40 Z" fill="#f0ead9" stroke="#8a8272" stroke-width="1"/>
+    <path d="M210 96 Q244 90 268 100 Q292 112 312 106 L314 190 Q280 178 250 184 Q222 188 208 172 Z" fill="#f0ead9" stroke="#8a8272" stroke-width="1"/>
+    <path d="M6 120 Q40 108 70 118 Q100 130 130 122 Q160 114 190 122 L196 190 Q160 182 130 188 Q100 192 70 184 Q30 188 6 176 Z" fill="#f0ead9" stroke="#8a8272" stroke-width="1"/>
+    <text x="152" y="96" font-family="Verdana" font-size="9" fill="#4d6f96" font-style="italic">Aegean</text>
+    <text x="158" y="108" font-family="Verdana" font-size="7" fill="#7d97b5">Sea</text>
+    ${[[120,52,"Thebes"],[150,66,"Athens"],[110,78,"Delphi"],[132,88,"Corinth"],[96,150,"Sparta"],[258,66,"Miletus"],[244,140,"Rhodes"]]
+      .map(([x,y,n])=>`<circle cx="${x}" cy="${y}" r="3" fill="#221f1a"/><text x="${x+6}" y="${y+3}" font-family="Verdana" font-size="8" fill="#5b564d">${n}</text>`).join("")}
+    <text x="12" y="22" font-family="Verdana" font-size="9" fill="#8a8272">N ↑</text>
+  </svg>`;
+}
+function timelineSVG(w){
+  const ev=[[-427,"Plato b."],[-399,"Socrates d."],[121,"M. Aurelius b."],[354,"Augustine b."],[1611,"KJV"],[1834,"Spurgeon b."]];
+  const X=y=>20+((y+430)/2320)*280;
+  return `<svg viewBox="0 0 320 64" width="${w}" xmlns="http://www.w3.org/2000/svg" style="display:block">
+    <line x1="10" y1="36" x2="310" y2="36" stroke="#8a8272" stroke-width="1.2"/>
+    ${ev.map(([y,l])=>`<line x1="${X(y)}" y1="30" x2="${X(y)}" y2="42" stroke="#c8a24a" stroke-width="1.6"/>
+      <text x="${X(y)}" y="24" font-family="Verdana" font-size="6.5" fill="#5b564d" text-anchor="middle">${l}</text>
+      <text x="${X(y)}" y="54" font-family="Verdana" font-size="6.5" fill="#8a8272" text-anchor="middle">${y<0?(-y)+" BC":y}</text>`).join("")}
+  </svg>`;
+}
+const PLATES=[
+  {n:"I", cap:"Plate I · The Aegean world", svg:mapSVG},
+  {n:"II", cap:"Plate II · The trial of Socrates, 399 BC", svg:()=>`<svg viewBox="0 0 320 200" width="280"><rect x="2" y="2" width="316" height="196" fill="none" stroke="#8a8272"/><text x="160" y="90" text-anchor="middle" font-family="Verdana" font-size="10" fill="#5b564d">schematic plate (prototype)</text><text x="160" y="110" text-anchor="middle" font-family="Verdana" font-size="8" fill="#8a8272">meletus · socrates · crito · the court</text></svg>`},
+  {n:"III", cap:"Plate III · One reading life, −430 → 1892", svg:timelineSVG},
+];
+
+/* ---------- Q1: dials on library rows ---------- */
+function dialSVG(pct){
+  const a=(pct/100)*359.9;
+  const rad=d=>(d-90)*Math.PI/180;
+  const nx=23+13*Math.cos(rad(pct*3.6)), ny=23+13*Math.sin(rad(pct*3.6));
+  const arc=pct<=0?"":`<path d="M23 6 A17 17 0 ${a>180?1:0} 1 ${23+17*Math.cos(rad(a))} ${23+17*Math.sin(rad(a))}" fill="none" stroke="#221f1a" stroke-width="2.5" stroke-linecap="round"/>`;
+  const ticks=[0,90,180,270].map(d=>{const x1=23+15*Math.cos(rad(d)),y1=23+15*Math.sin(rad(d)),x2=23+18*Math.cos(rad(d)),y2=23+18*Math.sin(rad(d));
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#8a8272" stroke-width="1"/>`;}).join("");
+  const notch=pct<=0||pct>=100?"":`<circle cx="${nx}" cy="${ny}" r="2.6" fill="#c8a24a"/>`;
+  return `<svg viewBox="0 0 46 46" width="46" height="46"><circle cx="23" cy="23" r="19" fill="none" stroke="#e4dfd2" stroke-width="1.5"/>${arc}${ticks}${notch}</svg>`;
+}
+function ringSVG(pct){
+  const c=2*Math.PI*19, off=c*(1-pct/100);
+  return `<svg viewBox="0 0 46 46" width="46" height="46"><circle cx="23" cy="23" r="19" fill="none" stroke="#e4dfd2" stroke-width="3"/>
+    <circle cx="23" cy="23" r="19" fill="none" stroke="#221f1a" stroke-width="3" stroke-linecap="round"
+      stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 23 23)"/></svg>`;
+}
+function dotsSVG(pct){
+  const n=Math.max(1,Math.round(pct/20)), cells=[0,1,2,3,4].map(i=>
+    `<circle cx="${8+i*9}" cy="23" r="3.2" fill="${i<Math.round(pct/20)?"#221f1a":"#e4dfd2"}"/>`).join("");
+  return `<svg viewBox="0 0 46 46" width="46" height="46">${cells}</svg>`;
+}
+function spineSVG(pct){
+  const h=44*(pct/100);
+  return `<svg viewBox="0 0 12 48" width="12" height="48"><rect x="1" y="1" width="10" height="46" rx="3" fill="none" stroke="#8a8272"/>
+    <rect x="2.5" y="${47-h}" width="7" height="${h}" rx="2" fill="#221f1a"/></svg>`;
+}
+function dialFor(v,pct){
+  if(v==="A")return `${dialSVG(pct)}<div style="font-size:10px;font-family:Verdana,sans-serif;color:#8a8272;text-align:center">${pct>0&&pct<100?pct+"%":pct===100?"read":"new"}</div>`;
+  if(v==="B")return `<div style="display:flex;align-items:center;gap:6px">${dotsSVG(pct)}<span style="font-size:10px;font-family:Verdana,sans-serif;color:#8a8272">${Math.round(pct/20)}/5</span></div>`;
+  if(v==="C")return spineSVG(pct);
+  return `${ringSVG(pct)}<div style="font-size:10px;font-family:Verdana,sans-serif;color:#8a8272;text-align:center">${pct>0&&pct<100?pct+"%":pct===100?"read":"unread"}</div>`;
+}
+function renderDials(){
+  content.innerHTML=`<h1 class="title">Library</h1><div class="byline">Q1 · the right-hand dial is the element under test — same 8 texts in every variant</div>`+
+    LIB.map(t=>`<div class="row" data-id="${t.t}"><div style="flex:1"><div class="t">${t.t}</div><div class="a">${t.a}</div><div class="grp">${t.g}</div></div><div class="dialbox">${dialFor(variant,t.pct)}</div></div>`).join("");
+  content.querySelectorAll(".row").forEach(r=>r.onclick=()=>setStatus(`dials · ${r.dataset.id} → would open reader at last line (not wired in prototype)`));
+}
+
+/* ---------- Q2: week strip on Progress ---------- */
+function renderWeek(){
+  let strip="";
+  if(variant==="A"){
+    strip=`<div class="weekdots">${WEEK.map(w=>`<div class="wd ${w.done?"done":""} ${w.today?"today":""}" data-d="${w.d}"><div class="d"></div><div class="l">${w.d[0]}</div></div>`).join("")}</div>`;
+  } else if(variant==="B"){
+    strip=`<div class="streakhead"><div><div class="n">${streak}</div><div class="u">day streak</div></div><div class="weekdots" style="gap:10px">${WEEK.map(w=>`<div class="wd ${w.done?"done":""} ${w.today?"today":""}" data-d="${w.d}"><div class="d" style="width:11px;height:11px"></div><div class="l">${w.d[0]}</div></div>`).join("")}</div></div>`;
+  } else if(variant==="C"){
+    const max=Math.max(...WEEK.map(w=>w.min),10);
+    strip=`<div class="vbars">${WEEK.map(w=>`<div class="vb ${w.done?"done":""}" data-d="${w.d}"><div class="d"></div><div class="b" style="height:${Math.round(48*(w.min/max))}px"></div><div class="l">${w.d[0]}</div></div>`).join("")}</div><div class="byline" style="margin-top:8px">bar height = minutes read · dot = a session completed</div>`;
+  } else {
+    let h=`<div class="pathdots">`;
+    WEEK.forEach((w,i)=>{ h+=`<div class="pd ${w.done?"done":""} ${w.today?"today":""}" data-d="${w.d}"></div>`;
+      if(i<WEEK.length-1){ const brk=!w.done||!WEEK[i+1].done; h+=`<div class="link ${brk?"brk":""}"></div>`; } });
+    strip=h+`</div>`;
+  }
+  content.innerHTML=`<h1 class="title">Progress</h1><div class="byline">Q2 · the week strip lives here — same week data in every variant</div>
+    <div class="card"><div class="lab">This week</div>${strip}</div>
+    <div class="card"><div class="lab">Mastery</div><div style="font-size:13px">3 mastered · 8 proficient · 14 familiar</div></div>
+    <div class="card"><div class="lab">Streak</div><div style="font-size:13px">${streak}-day streak — habit, not mastery</div></div>`;
+  content.querySelectorAll("[data-d]").forEach(d=>d.onclick=()=>{const w=WEEK.find(x=>x.d===d.dataset.d);
+    setStatus(`week · ${w.d} · ${w.done?`${w.min}m read, session complete`:"no session"}`);});
+}
+function streakCount(){
+  let i=WEEK.length-1;
+  if(WEEK[i].today&&!WEEK[i].done)i--; // pending today does not break the streak
+  let n=0; while(i>=0&&WEEK[i].done){n++;i--;}
+  return n;
+}
+const streak=streakCount();
+
+/* ---------- Q3: checkpoint signature ---------- */
+function renderSignature(){
+  content.innerHTML=`<h1 class="title">Crito</h1><div class="byline">Q3 · same checkpoint mechanic in every variant — only the identity changes · scroll to cross checkpoints</div>`+
+    EXCERPT.map((p,i)=>`<p class="para" data-i="${i}">${i%CHECK_EVERY===CHECK_EVERY-1?`<span class="mark" data-i="${i}"></span>`:""}${p}</p>`).join("")+
+    `<div class="pause-chip" id="pausechip">⏸ pause at this checkpoint</div>`;
+  if(variant==="C"){
+    content.querySelectorAll(".para").forEach(p=>p.style.paddingLeft="18px");
+    const ticks=[];
+    for(let i=CHECK_EVERY-1;i<EXCERPT.length;i+=CHECK_EVERY)ticks.push(`<div class="tick" data-i="${i}" style="top:${Math.round((i+0.5)/EXCERPT.length*100)}%"></div>`);
+    content.insertAdjacentHTML("beforeend",`<div class="scalecol" id="scalecol"><div class="line"></div>${ticks.join("")}<div class="needle" id="needle" style="top:0"></div></div>`);
+  }
+  const chip=el("pausechip"); if(chip)chip.onclick=()=>setStatus(`signature · variant ${variant} · PAUSED at checkpoint — next open restores this exact line; session counted to here`);
+}
+
+/* ---------- Q4: plates ---------- */
+function renderPlates(){
+  if(variant==="A"){
+    content.innerHTML=`<h1 class="title">Crito</h1><div class="byline">Q4 · a plate sits in the reading flow of ancient texts, like a book plate</div>`+
+      EXCERPT.slice(0,3).map(p=>`<p class="para">${p}</p>`).join("")+
+      `<div class="platefig" id="platefig">${mapSVG(300)}<div class="cap">Plate I · The Aegean world — tap to open</div></div>`+
+      EXCERPT.slice(3).map(p=>`<p class="para">${p}</p>`).join("");
+    el("platefig").onclick=()=>openPlate(0);
+  } else if(variant==="B"){
+    content.innerHTML=`<h1 class="title">Library</h1><div class="byline">Q4 · ancient rows carry a plate badge; tap opens a plate gallery</div>`+
+      LIB.filter(t=>t.g==="classics").map((t,i)=>`<div class="row"><div style="flex:1"><div class="t">${t.t}</div><div class="a">${t.a}</div></div><div class="badge" data-p="0">PL. I</div></div>`).join("")+
+      `<div class="byline" style="margin-top:14px">…christian & lives rows stay unbadged</div>`;
+    content.querySelectorAll(".badge").forEach(b=>b.onclick=()=>openPlate(0));
+  } else {
+    content.innerHTML=`<h1 class="title">Session complete</h1><div class="byline">Q4 · the plate is the session's artifact on the completed screen</div>
+      <div class="card"><div class="artifact"><div class="th" id="th">${mapSVG(84)}</div>
+        <div style="flex:1"><div style="font-size:14px">Crito · +4 review cards</div>
+        <div class="byline" style="margin-top:6px">Plate I · The Aegean world</div></div></div></div>
+      <button class="pickchip" style="position:static;margin-top:10px" id="viewplate">open plate</button>`;
+    el("viewplate").onclick=()=>openPlate(0);
+  }
+}
+function openPlate(start){
+  let cur=start;
+  const old=el("ov"); if(old)old.remove();
+  const p=PLATES[cur];
+    content.insertAdjacentHTML("beforeend",`<div class="overlay" id="ov" style="display:flex">
+      <div class="cardw"><div id="pbody">${p.svg(280)}</div><div style="margin-top:8px;font-size:10px;font-family:Verdana,sans-serif;text-transform:uppercase;letter-spacing:.07em;color:#8a8272">${p.cap}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+        <span style="font-size:10px;font-family:Verdana,sans-serif;color:#8a8272">${cur+1} / ${PLATES.length}</span>
+        <div><button id="gprev" style="font-size:15px;background:none;border:none;cursor:pointer">←</button>
+        <button id="gnext" style="font-size:15px;background:none;border:none;cursor:pointer">→</button></div></div></div>
+      <div style="font-family:Verdana,sans-serif;font-size:11px;color:#b9b4aa;cursor:pointer" id="ovclose">close</div></div>`);
+  el("gprev").onclick=()=>{cur=(cur+PLATES.length-1)%PLATES.length;el("ov").remove();openPlate(cur);};
+  el("gnext").onclick=()=>{cur=(cur+1)%PLATES.length;el("ov").remove();openPlate(cur);};
+  el("ovclose").onclick=()=>el("ov").remove();
+}
+
+/* ---------- shell: scroll binding for signature variants ---------- */
+function bindSignatureScroll(){
+  const onScroll=()=>{
+    const panes=content.querySelectorAll(".para"); let last=0;
+    panes.forEach(p=>{ if(p.getBoundingClientRect().top<screenEl.getBoundingClientRect().bottom-80) last=+p.dataset.i; });
+    const lastCp=Math.floor((last+1)/CHECK_EVERY)-1;
+    content.querySelectorAll(".mark").forEach(d=>{
+      const i=+d.dataset.i, near=Math.abs(i-last)<=1;
+      d.classList.toggle("near",near);
+      if(variant==="B")d.classList.toggle("breathe",i<=(lastCp+1)*CHECK_EVERY-1&&i>lastCp*CHECK_EVERY-1);
+    });
+    const sc=el("scalecol");
+    if(sc){ sc.querySelectorAll(".tick").forEach(t=>t.classList.toggle("passed",+t.dataset.i<=last));
+      const n=el("needle"); if(n)n.style.top=Math.min(Math.round((last+0.5)/EXCERPT.length*100),97)+"%"; }
+    const chip=el("pausechip");
+    if(chip&&variant!=="C")chip.style.display=(last%CHECK_EVERY===CHECK_EVERY-1)?"block":"none";
+    if(chip&&variant==="C")chip.style.display="block";
+    setStatus(`signature · variant ${variant} · last paragraph seen=${last+1}/${EXCERPT.length} · checkpoint crossed=${lastCp+1}`);
+  };
+  screenEl.onscroll=onScroll; content.onscroll=onScroll;
+}
+
+/* ---------- status ---------- */
+function setStatus(s){
+  el("state").innerHTML=`${s}<br><span class="picks">PICKS — ${PICK_KEYS.map(k=>`${k}=${picks[k]||"∅"}`).join(" · ")}</span>`;
+}
+
+/* ---------- shell render ---------- */
+const VARIANTS={
+  dials:{A:"quarters dial",B:"checkpoint dots",C:"spine fill",D:"plain ring (today)"},
+  week:{A:"quiet dots",B:"streak head",C:"volume bars",D:"linked path"},
+  signature:{A:"quiet marks",B:"breathing marks",C:"instrument column",D:"diamond marks"},
+  plates:{A:"chapter plate in reader",B:"library badge gallery",C:"post-session artifact"},
+};
+const QB={dials:"What does a reading dial look like on a library row?",week:"What does the week strip on Progress look like?",
+           signature:"Which checkpoint treatment is the visual signature?",plates:"How do ancient-track plates surface?"};
+function render(){
+  el("appbar").innerHTML=`Eruditio · <b>${page}</b> — ${QB[page]}`;
+  el("vlabel").textContent=`${variant} (${VARIANTS[page][variant]})`;
+  el("pickchip").classList.toggle("picked",picks[page]===variant);
+  ({dials:renderDials,week:renderWeek,signature:renderSignature,plates:renderPlates})[page]();
+  el("pagetabs").innerHTML=[["dials","Dials"],["week","Week"],["signature","Signature"],["plates","Plates"]]
+    .map(([k,l])=>`<div class="${page===k?"on":""}" data-p="${k}">${l}</div>`).join("");
+  el("pagetabs").querySelectorAll("div").forEach(t=>t.onclick=()=>{page=t.dataset.p;param("page",page);variant="A";render();setStatus(`${page} · variant A (${VARIANTS[page].A}) — ${QB[page]}`);});
+  param("variant",variant); param("picks",Object.entries(picks).map(([k,v])=>`${k}:${v}`).join(","));
+  if(page==="signature")bindSignatureScroll();
+}
+function cycle(dir){
+  const keys=Object.keys(VARIANTS[page]);
+  variant=keys[(keys.indexOf(variant)+dir+keys.length)%keys.length];
+  render();
+  setStatus(`${page} · variant ${variant} (${VARIANTS[page][variant]}) — ${QB[page]}`);
+}
+el("prev").onclick=()=>cycle(-1);
+el("next").onclick=()=>cycle(1);
+el("pickchip").onclick=()=>{picks[page]=variant;render();setStatus(`PICKED ${page}=${variant} — recorded in the state line and URL`);};
+el("toggletheme").onclick=()=>{dark=!dark;screenEl.classList.toggle("dark",dark);el("toggletheme").textContent=dark?"◐ light":"◐ dark";};
+document.addEventListener("keydown",e=>{
+  if(/input|textarea/i.test(document.activeElement.tagName))return;
+  if(e.key==="ArrowRight")cycle(1); if(e.key==="ArrowLeft")cycle(-1);
+});
+render();
+setStatus("pick a direction per page with the ✓ button — the verdict gets folded into the Compose implementation");
+</script>
+</body>
+</html>
